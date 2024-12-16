@@ -9,24 +9,19 @@ client = openai.OpenAI()
 model = "gpt-4o-mini"
 
 # === Create the Assistant ===
-ai_advisor = client.beta.assistants.create(
-    name="AI Advisor Test",
-    instructions="""You are the best personal trainer and nutritionist who knows how to get clients to build lean muscles.
-     You've trained high-caliber athletes and movie stars.""",
-    model=model,
-)
-assistant_id = ai_advisor.id
+# ai_advisor = client.beta.assistants.create(
+#     name="CS Advisor",
+#     instructions="""You are a CS Advisor for students at the university of Virginia. If you don't know the information provided, use the retrevial tool to better answer the question. IMPORTANT: Only answer advising related questions.
+#         """,
+#     model=model,
+#     tools=[{"type": "file_search"}],
+#     tool_resources={"file_search": {"vector_store_ids": ["vs_ziscdQwFY0A5sZIkGR8qu3a2"]}},
+# )
+assistant_id = "asst_aZZd6r1tlPiBqBZtjoTbQyvR"
 print(f"Assistant ID: {assistant_id}")
 
 # === Create the Thread ===
-thread = client.beta.threads.create(
-    messages=[
-        {
-            "role": "user",
-            "content": "How do I get started working out to lose fat and build muscles?",
-        }
-    ]
-)
+thread = client.beta.threads.create()
 thread_id = thread.id
 print(f"Thread ID: {thread_id}")
 

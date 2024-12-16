@@ -1,0 +1,118 @@
+### B.S. in Computer Science at UVA (School of Engineering and Applied Science)
+
+#### Overview
+
+The Bachelor of Science in Computer Science (BSCS) program is offered by the School of Engineering and Applied Science (SEAS). Students must fulfill SEAS general requirements in addition to completing CS-specific courses.
+
+For more information:
+
+- [UVA CS Advising](http://uvacsadvising.org)
+- [UVA Engineering Website](https://engineering.virginia.edu)
+
+---
+
+#### General SEAS Curriculum Requirements
+
+All SEAS students must complete these foundational courses:
+
+- **APMA 1110** - Single Variable Calculus II (4 credits)
+- **APMA 2120** - Multivariable Calculus III (4 credits)
+- **CHEM 1410/1411** - Introductory Chemistry I & Lab (4 credits)
+- **PHYS 1425/1429** - Introductory Physics I & Lab (4 credits)
+- **PHYS 2415/2419** - Introductory Physics II & Lab OR **ECE 2200** - Applied Physics (4 credits)
+- **ENGR 1010 & 1020** - Engineering Foundations I & II (7 credits)
+- **STS 4500** - STS and Engineering Practice (3 credits)
+- **STS 4600** - The Engineer, Ethics, and Professional Responsibility (3 credits)
+
+Additional electives:
+
+- Humanities or Social Science Electives: 15 credits (9 credits included in SEAS core requirements)
+- Math and Science Elective: 3 credits
+
+---
+
+#### Differences Between BSCS and BACS Degrees
+
+The BSCS degree is offered through SEAS, while the Bachelor of Arts in Computer Science (BACS) is offered through the College of Arts and Sciences. Key differences:
+
+1. **General Requirements**: BSCS requires SEAS core courses (math, science, engineering). BACS focuses on liberal arts requirements.
+2. **Capstone/Thesis**: BSCS requires a fourth-year thesis (STS 4500/4600). BACS students may pursue an optional Distinguished Majors thesis.
+3. **CS Electives**: BSCS requires 15 credits (5 courses); BACS requires 9 credits (3 courses).
+4. **Integration Electives**: BACS includes 4 integration electives; BSCS does not.
+
+---
+
+#### Core CS Courses
+
+**Introduction to Programming**
+
+- CS 111X (3 credits): Options include CS 1110, CS 1111, CS 1112, and CS 1113.
+  - CS 1110: General introduction, no prior experience required.
+  - CS 1111: For students with some programming experience.
+  - CS 1112: Combined lecture and lab for beginners.
+  - CS 1113: Special topics course offered occasionally.
+
+**Foundation Courses** (Complete before upper-level courses):
+
+- **CS 2100** - Data Structures and Algorithms 1 (4 credits)
+- **CS 2120** - Discrete Mathematics and Theory 1 (3 credits)
+- **CS 2130** - Computer Systems and Organization 1 (4 credits)
+- **CS 3100** - Data Structures and Algorithms 2 (3 credits)
+- **CS 3120** - Discrete Mathematics and Theory 2 (3 credits)
+- **CS 3130** - Computer Systems and Organization 2 (4 credits)
+- **CS 3140** - Software Development Essentials (3 credits)
+
+---
+
+#### Upper-Level Courses and Requirements
+
+- **Advanced Software Development**: CS 3240 (3 credits)
+- **Capstone Options**:
+  - CS 4980 (Capstone Research) or CS 4991 (Capstone Technical Report with a 6th elective)
+
+**CS Electives**
+
+- 15 credits of CS courses at the 3000 level or above.
+  - Must have the CS mnemonic.
+  - Exclusions: Foundation courses, upper-level required courses, and some restricted electives.
+
+---
+
+#### Applied Mathematics Requirements
+
+BSCS majors must take three additional APMA courses beyond the SEAS core:
+
+- **APMA 3100** - Probability (3 credits)
+- Choose two:
+  - **APMA 2130** - Ordinary Differential Equations (4 credits)
+  - **APMA 3080** - Linear Algebra (3 credits)
+  - **APMA 3120** - Statistics (3 credits)
+  - **APMA 3150** - From Data to Knowledge (3 credits)
+
+---
+
+#### Cybersecurity Focal Path
+
+Students may pursue the National Center of Excellence in Cyber Defense (NCAE-CD) focal path, requiring 10 courses covering specific cybersecurity Knowledge Units.
+
+---
+
+#### Declaring or Transferring into the BSCS Program
+
+- **Declaring the Major**: Students must submit their preferences during their first year.
+- **Transfer Students**:
+  - Internal: Apply through the SEAS process; must have completed CS 2100.
+  - External: Strongly encouraged to complete foundational courses (e.g., CS 2110, CS 2102) before transfer.
+
+---
+
+#### GPA and Graduation Requirements
+
+- Minimum CS GPA: 2.0
+- Senior Thesis Portfolio: Includes the Capstone Technical Report and STS courses.
+- Unrestricted Electives: 15 credits from any graded courses except those restricted by the program (e.g., MATH < 1310, SCPS courses).
+
+---
+
+For detailed advising and resources, visit the [UVA CS Advising Page](http://uvacsadvising.org).
+
