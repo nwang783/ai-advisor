@@ -1,0 +1,127 @@
+/* Dark theme for AI Advisor */
+body {
+    background-color: #121212;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  
+  .ai-advisor-container {
+    max-width: 1000px;
+    width: 100%;
+    margin: 0 auto;
+    border: 1px solid #333;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+  }
+  
+  .chat-header {
+    background-color: #2a2a2a;
+    padding: 15px;
+    text-align: center;
+    border-bottom: 1px solid #333;
+  }
+  
+  .chat-header h2 {
+    margin: 0;
+    color: #e0e0e0;
+    font-weight: 600;
+  }
+  
+  .chat-messages {
+    height: 600px;
+    overflow-y: auto;
+    padding: 20px;
+    background-color: #121212;
+  }
+  
+  .message {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    gap: 10px;
+    color: #e0e0e0;
+  }
+  
+  .message-content {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+    padding: 10px 15px;
+    border-radius: 12px;
+    max-width: 80%;
+    line-height: 1.5;
+  }
+  
+  .user-message {
+    flex-direction: row-reverse;
+    text-align: right;
+  }
+  
+  .user-message .message-content {
+    background-color: #1a3d5a;
+    color: #e0e0e0;
+  }
+  
+  .ai-message {
+    text-align: left;
+  }
+  
+  .chat-input {
+    display: flex;
+    padding: 15px;
+    background-color: #2a2a2a;
+    border-top: 1px solid #333;
+  }
+  
+  .chat-input input {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #444;
+    border-radius: 8px;
+    margin-right: 10px;
+    font-size: 16px;
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+  
+  .chat-input button {
+    background-color: #0056b3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s ease;
+  }
+  
+  .chat-input button:hover {
+    background-color: #003d82;
+  }
+  
+  /* Scrollbar styling for dark theme */
+  .chat-messages::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .chat-messages::-webkit-scrollbar-track {
+    background: #2a2a2a;
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+  }
+  
+  .chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #777;
+  }

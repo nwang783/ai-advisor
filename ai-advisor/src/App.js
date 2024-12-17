@@ -1,10 +1,10 @@
 import './App.css';
-import ClassScheduler from './pages/classPlanner';
+import AIAdvisor from './pages/aiAdvisor';
 
 function App() {
   return (
     <div className="App">
-      <ClassScheduler/>
+      <AIAdvisor/>
     </div>
   );
 }
