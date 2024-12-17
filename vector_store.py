@@ -7,10 +7,10 @@ load_dotenv()
 client = openai.OpenAI()
 
 # Create a vector store caled "Financial Statements"
-vector_store = client.beta.vector_stores.create(name="BSCS")
+vector_store = client.beta.vector_stores.create(name="BSCS_Info")
 
 # Ready the files for upload to OpenAI
-file_paths = ["UVA_BSCS.txt"]
+file_paths = ["BSCS_example_degree.txt", "UVA_BSCS.txt"]
 file_streams = [open(path, "rb") for path in file_paths]
 
 # Use the upload and poll SDK helper to upload the files, add them to the vector store,

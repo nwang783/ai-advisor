@@ -9,15 +9,15 @@ client = openai.OpenAI()
 model = "gpt-4o-mini"
 
 # === Create the Assistant ===
-# ai_advisor = client.beta.assistants.create(
-#     name="CS Advisor",
-#     instructions="""You are a CS Advisor for students at the university of Virginia. If you don't know the information provided, use the retrevial tool to better answer the question. IMPORTANT: Only answer advising related questions.
-#         """,
-#     model=model,
-#     tools=[{"type": "file_search"}],
-#     tool_resources={"file_search": {"vector_store_ids": ["vs_ziscdQwFY0A5sZIkGR8qu3a2"]}},
-# )
-assistant_id = "asst_aZZd6r1tlPiBqBZtjoTbQyvR"
+ai_advisor = client.beta.assistants.create(
+    name="CS Advisor V2",
+    instructions="""You are a Copmuter Science advisor for students at the university of Virginia. If you don't know the information provided, use the retrevial tool to better answer the question. IMPORTANT: Use the file search tool whenever you are asked any question.
+        """,
+    model=model,
+    tools=[{"type": "file_search"}],
+    tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}},
+)
+assistant_id = ai_advisor.id
 print(f"Assistant ID: {assistant_id}")
 
 # === Create the Thread ===

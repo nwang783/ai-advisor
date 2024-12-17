@@ -1,0 +1,83 @@
+### Example BSCS Semester Schedule (AY 2024-2025)
+
+#### First Year
+**First Semester**
+- APMA 1110 - Single Variable Calculus II (4 credits)
+- CHEM 1410 - Introductory College Chemistry I (3 credits)
+- CHEM 1411 - Introductory Chemistry I Lab (1 credit)
+- ENGR 1010 - Engineering Foundations I (4 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 15**
+
+**Second Semester**
+- CS 111X - Introduction to Programming (3 credits)
+- APMA 2120 - Multivariable Calculus (4 credits)
+- ENGR 1020 - Engineering Foundations II (3 credits)
+- PHYS 1425 & 1429 - Introductory Physics I & Lab (4 credits)
+- Math/Science Elective (3 credits)
+
+**Total Credits: 17**
+
+---
+
+#### Second Year
+**Third Semester**
+- CS 2100 - Data Structures & Algorithms 1 (4 credits)
+- CS 2120 - Discrete Mathematics and Theory 1 (3 credits)
+- ECE 2200 - Applied Physics (4 credits)
+- STS 2600 - Engineering Ethics (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 17**
+
+**Fourth Semester**
+- CS 2130 - Computer Systems & Organization 1 (4 credits)
+- CS 3140 - Software Development Essentials (3 credits)
+- APMA 3100 - Probability (3 credits)
+- Humanities/Social Science Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 16**
+
+---
+
+#### Third Year
+**Fifth Semester**
+- CS 3100 - Data Structures & Algorithms 2 (3 credits)
+- CS 3240 - Software Engineering (3 credits)
+- APMA Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 15**
+
+**Sixth Semester**
+- CS 3120 - Discrete Mathematics and Theory 2 (3 credits)
+- CS 3130 - Computer Systems & Organization 2 (4 credits)
+- CS Elective (3 credits)
+- APMA Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 16**
+
+---
+
+#### Fourth Year
+**Seventh Semester**
+- STS 4500 - STS and Engineering Practice (3 credits)
+- CS Elective (3 credits)
+- CS Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 15**
+
+**Eighth Semester**
+- STS 4600 - The Engineer, Ethics, and Professional Responsibility (3 credits)
+- CS Capstone (3 credits)
+- CS Elective (3 credits)
+- CS Elective (3 credits)
+- Humanities/Social Science Elective (3 credits)
+
+**Total Credits: 15**
