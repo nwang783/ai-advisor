@@ -1,16 +1,20 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, User, Bot } from 'lucide-react';
-import '../styles/aiAdvisorStyles.css';
+import React, { useState, useRef, useEffect } from "react";
+import { Send, User, Bot } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import "../styles/aiAdvisorStyles.css";
+import { functions } from "../firebase";
+import { httpsCallable } from "firebase/functions";
 
 const AIAdvisor = () => {
   const [messages, setMessages] = useState([
-    { 
-      id: 0, 
-      text: "Hello! I'm your AI assistant. How can I help you today?", 
-      sender: 'ai' 
-    }
+    {
+      id: 0,
+      text: "Hello! I'm your AI assistant. How can I help you today?",
+      sender: "ai",
+    },
   ]);
-  const [inputMessage, setInputMessage] = useState('');
+  const [inputMessage, setInputMessage] = useState("");
+  const [threadId, setThreadId] = useState(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -21,29 +25,55 @@ const AIAdvisor = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (inputMessage.trim() === '') return;
+  const handleSendMessage = async () => {
+    if (inputMessage.trim() === "") return;
 
-    // Add user message
+    // Add user message to the chat
     const newUserMessage = {
       id: messages.length,
       text: inputMessage,
-      sender: 'user'
+      sender: "user",
     };
 
-    // Simulate AI response (replace with actual AI logic)
-    const newAIMessage = {
-      id: messages.length + 1,
-      text: `You said: "${inputMessage}". I'm still learning how to respond.`,
-      sender: 'ai'
-    };
+    setMessages((prev) => [...prev, newUserMessage]);
 
-    setMessages(prevMessages => [...prevMessages, newUserMessage, newAIMessage]);
-    setInputMessage('');
+    try {
+      const csAdvisorChat = httpsCallable(functions, "csAdvisorChat");
+      console.log(`Sending request:`, { user_message: inputMessage, thread_id: threadId });
+
+      const result = await csAdvisorChat({
+        user_message: inputMessage,
+        thread_id: threadId,
+      });
+
+      const { response, thread_id } = result.data;
+
+      // Update threadId
+      setThreadId(thread_id);
+
+      // Add AI response to the chat
+      const newAIMessage = {
+        id: messages.length + 1,
+        text: response,
+        sender: "ai",
+      };
+
+      setMessages((prev) => [...prev, newAIMessage]);
+    } catch (error) {
+      console.error("Error calling Firebase function:", error);
+      const errorMessage = {
+        id: messages.length + 1,
+        text: "Sorry, there was an error processing your request.",
+        sender: "ai",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    }
+
+    setInputMessage("");
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSendMessage();
     }
   };
@@ -55,20 +85,26 @@ const AIAdvisor = () => {
       </div>
       <div className="chat-messages">
         {messages.map((message) => (
-          <div 
-            key={message.id} 
-            className={`message ${message.sender === 'user' ? 'user-message' : 'ai-message'}`}
+          <div
+            key={message.id}
+            className={`message ${
+              message.sender === "user" ? "user-message" : "ai-message"
+            }`}
           >
-            {message.sender === 'user' ? <User size={20} /> : <Bot size={20} />}
+            {message.sender === "user" ? <User size={20} /> : <Bot size={20} />}
             <div className="message-content">
-              {message.text}
+              {message.sender === "ai" ? (
+                <ReactMarkdown>{message.text}</ReactMarkdown>
+              ) : (
+                message.text
+              )}
             </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input">
-        <input 
+        <input
           type="text"
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
