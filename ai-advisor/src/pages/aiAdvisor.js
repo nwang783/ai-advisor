@@ -2,8 +2,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { Send, User, Bot } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import "../styles/aiAdvisorStyles.css";
-import { functions } from "../firebase";
-import { httpsCallable } from "firebase/functions";
 
 const AIAdvisor = () => {
   const [messages, setMessages] = useState([
@@ -15,6 +13,7 @@ const AIAdvisor = () => {
   ]);
   const [inputMessage, setInputMessage] = useState("");
   const [threadId, setThreadId] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -26,7 +25,7 @@ const AIAdvisor = () => {
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (inputMessage.trim() === "") return;
+    if (inputMessage.trim() === "" || isLoading) return;
 
     // Add user message to the chat
     const newUserMessage = {
@@ -36,45 +35,58 @@ const AIAdvisor = () => {
     };
 
     setMessages((prev) => [...prev, newUserMessage]);
+    setInputMessage("")
+    setIsLoading(true);
 
     try {
-      const csAdvisorChat = httpsCallable(functions, "csAdvisorChat");
-      console.log(`Sending request:`, { user_message: inputMessage, thread_id: threadId });
-
-      const result = await csAdvisorChat({
-        user_message: inputMessage,
-        thread_id: threadId,
+      // Instead of using httpsCallable, make a direct fetch to the Cloud Function URL
+      const response = await fetch('https://cs-advisor-yjuaxbcwea-uc.a.run.app', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: inputMessage,
+          threadId: threadId
+        })
       });
 
-      const { response, thread_id } = result.data;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Response data:', data);
 
       // Update threadId
-      setThreadId(thread_id);
+      if (data.threadId) {
+        setThreadId(data.threadId);
+      }
 
       // Add AI response to the chat
       const newAIMessage = {
         id: messages.length + 1,
-        text: response,
+        text: data.response,
         sender: "ai",
       };
 
       setMessages((prev) => [...prev, newAIMessage]);
-      setInputMessage("")
     } catch (error) {
-      console.error("Error calling Firebase function:", error);
+      console.error("Error calling Cloud Function:", error);
       const errorMessage = {
         id: messages.length + 1,
-        text: "Sorry, there was an error processing your request.",
+        text: "Sorry, there was an error processing your request. Please try again later.",
         sender: "ai",
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
-
-    setInputMessage("");
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       handleSendMessage();
     }
   };
@@ -102,6 +114,14 @@ const AIAdvisor = () => {
             </div>
           </div>
         ))}
+        {isLoading && (
+          <div className="message ai-message">
+            <Bot size={20} />
+            <div className="message-content">
+              <span className="loading-dots">Thinking</span>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input">
@@ -111,8 +131,9 @@ const AIAdvisor = () => {
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Type your message..."
+          disabled={isLoading}
         />
-        <button onClick={handleSendMessage}>
+        <button onClick={handleSendMessage} disabled={isLoading}>
           <Send size={20} />
         </button>
       </div>

@@ -125,3 +125,30 @@ body {
   .chat-messages::-webkit-scrollbar-thumb:hover {
     background: #777;
   }
+
+  .loading-dots {
+    display: inline-block;
+  }
+  
+  .loading-dots:after {
+    content: '.';
+    animation: dots 1.5s steps(5, end) infinite;
+  }
+  
+  @keyframes dots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60% { content: '...'; }
+    80%, 100% { content: ''; }
+  }
+  
+  /* Make sure the input and button are properly styled when disabled */
+  .chat-input input:disabled {
+    background-color: #2A2A2A;
+    cursor: not-allowed;
+  }
+  
+  .chat-input button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
