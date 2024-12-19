@@ -3,3 +3,6 @@ venv
 
 # env variables
 .env
+
+# Firebase Key
+gpt-advisor-firebase-adminsdk-ct285-8f45ca05e4.json

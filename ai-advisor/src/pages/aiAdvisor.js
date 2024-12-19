@@ -9,7 +9,7 @@ const AIAdvisor = () => {
   const [messages, setMessages] = useState([
     {
       id: 0,
-      text: "Hello! I'm your AI assistant. How can I help you today?",
+      text: "Hello! I'm your BSCS AI advisor. How can I help you today?",
       sender: "ai",
     },
   ]);
@@ -59,6 +59,7 @@ const AIAdvisor = () => {
       };
 
       setMessages((prev) => [...prev, newAIMessage]);
+      setInputMessage("")
     } catch (error) {
       console.error("Error calling Firebase function:", error);
       const errorMessage = {
@@ -81,7 +82,7 @@ const AIAdvisor = () => {
   return (
     <div className="ai-advisor-container">
       <div className="chat-header">
-        <h2>AI Advisor</h2>
+        <h2>BSCS AI Advisor</h2>
       </div>
       <div className="chat-messages">
         {messages.map((message) => (
