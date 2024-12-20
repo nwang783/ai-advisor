@@ -2,7 +2,7 @@ import requests
 import json
 
 def test_cs_advisor(message, thread_id=None):
-    url = "http://localhost:5001/gpt-advisor/us-central1/cs_advisor"
+    url = "http://127.0.0.1:5001/gpt-advisor/us-central1/cs_advisor"
     
     # Prepare the request payload
     payload = {
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # test_cs_advisor("What are the prerequisites for CS2150?")
     
     print("\n=== Test 2: Asking about a professor ===")
-    test_cs_advisor("What is Professor Mark Sherriff's rating?", thread_id="thread_T3Al6U64irgG09mdAD4pYp0p")
+    test_cs_advisor("Which professors teach CHEM 1410?")
     
     # If you want to test conversation continuity, uncomment and modify these lines:
     # thread_id = "your_thread_id_from_first_response"

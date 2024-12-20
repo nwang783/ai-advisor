@@ -1,26 +1,31 @@
-from firebase_functions import https_fn
-from firebase_admin import initialize_app
-from firebase_functions.params import StringParam
-import ratemyprofessor
-import json
-from openai import OpenAI
+import openai
+from dotenv import find_dotenv, load_dotenv
 import time
+import logging
+import json
+import ratemyprofessor
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 
-# Initialize Firebase Admin
-initialize_app()
+load_dotenv()
 
-# Define configuration parameters
-OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
-ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_dXiCpxEc4Nfu2INAoKgDLOgN")
+client = openai.OpenAI()
+model = "gpt-4o-mini"
 
-# Cache the UVA school object
+# Cache the UVA school object to avoid repeated API calls
 UVA_SCHOOL = ratemyprofessor.get_school_by_name("University of Virginia")
 
+def get_course_prerequisites(course_id):
+    prereqs = {
+        "CS2100": ["CS1110", "CS1111", "CS1112", "CS1113"],
+        "CS2150": ["CS2100"],
+        "CS3140": ["CS2150"]
+    }
+    return json.dumps(prereqs.get(course_id, []))
+
 def get_professor_rating(professor_name):
-    """Get professor rating from RateMyProfessor"""
+    """Get professor rating information from RateMyProfessor"""
     try:
         professor = ratemyprofessor.get_professor_by_school_and_name(UVA_SCHOOL, professor_name)
         
@@ -42,18 +47,10 @@ def get_professor_rating(professor_name):
         return json.dumps({
             "error": f"Error retrieving professor information: {str(e)}"
         })
-
-def get_course_prerequisites(course_id):
-    """Get course prerequisites"""
-    prereqs = {
-        "CS2100": ["CS1110", "CS1111", "CS1112", "CS1113"],
-        "CS2150": ["CS2100"],
-        "CS3140": ["CS2150"]
-    }
-    return json.dumps(prereqs.get(course_id, []))
-
+    
 def search_courses(instructor="", mnemonic="", number=""):
     """Search for courses based on provided criteria"""
+    print("Starting course search...")
     try:
         base_url = "https://louslist.org/pagex.php"
         
@@ -90,7 +87,7 @@ def search_courses(instructor="", mnemonic="", number=""):
         
         # Construct URL
         url = f"{base_url}?{urlencode(params)}"
-        
+
         # Fetch and parse data
         response = requests.get(url)
         response.raise_for_status()
@@ -155,66 +152,112 @@ def search_courses(instructor="", mnemonic="", number=""):
                 course_text += section_text
             output.append(course_text)
 
-            
+        print(output)
+
         return "\n".join(output) if output else "No courses found matching the criteria."
         
     except Exception as e:
         return f"Error searching courses: {str(e)}"
 
-@https_fn.on_request()
-def cs_advisor(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
+# === Create the Assistant ===
+# ai_advisor = client.beta.assistants.create(
+#     name="CS Advisor V2",
+#     instructions="""You are a Computer Science advisor for students at the University of Virginia. 
+#     Use the file search tool for general questions, the prerequisites tool for course requirement questions,
+#     the professor rating tool to provide information about professors, and the course search tool to find 
+#     current course offerings and their details, including what classes certain proffesors teach.
+#     IMPORTANT: Use the file search tool whenever you are asked any question related to the BSCS degree.""",
+#     model=model,
+#     tools=[
+#         {"type": "file_search"},
+#         {
+#             "type": "function",
+#             "function": {
+#                 "name": "get_course_prerequisites",
+#                 "description": "Get prerequisites for a specific UVA CS course",
+#                 "parameters": {
+#                     "type": "object",
+#                     "properties": {
+#                         "course_id": {
+#                             "type": "string",
+#                             "description": "The course ID (e.g., CS2150)"
+#                         }
+#                     },
+#                     "required": ["course_id"]
+#                 }
+#             }
+#         },
+#         {
+#             "type": "function",
+#             "function": {
+#                 "name": "get_professor_rating",
+#                 "description": "Get RateMyProfessor information for a UVA professor",
+#                 "parameters": {
+#                     "type": "object",
+#                     "properties": {
+#                         "professor_name": {
+#                             "type": "string",
+#                             "description": "The professor's name"
+#                         }
+#                     },
+#                     "required": ["professor_name"]
+#                 }
+#             }
+#         },
+#         {
+#             "type": "function",
+#             "function": {
+#                 "name": "search_courses",
+#                 "description": "Search for UVA courses, professors, and their sections. Be sure to include the 'Type' and 'Enrollment' in your response.",
+#                 "parameters": {
+#                     "type": "object",
+#                     "properties": {
+#                         "instructor": {
+#                             "type": "string",
+#                             "description": "The instructor's name (optional)"
+#                         },
+#                         "mnemonic": {
+#                             "type": "string",
+#                             "description": "The course mnemonic (e.g., CS, APMA) (optional)"
+#                         },
+#                         "number": {
+#                             "type": "string",
+#                             "description": "The course number (e.g., 2150) (optional)"
+#                         }
+#                     }
+#                 }
+#             }
+#         }
+#     ],
+#     tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}},
+# )
+
+assistant_id = "asst_dXiCpxEc4Nfu2INAoKgDLOgN"
+print(f"Assistant ID: {assistant_id}")
+
+# === Create the Thread ===
+thread = client.beta.threads.create()
+thread_id = thread.id
+print(f"Thread ID: {thread_id}")
+
+def wait_for_run_completion(client, thread_id, assistant_id, user_message, sleep_interval=5):
+    """Handles communication with the assistant and waits for the run to complete."""
     try:
-        # Handle CORS preflight requests
-        if req.method == 'OPTIONS':
-            return https_fn.Response(
-                status=204,
-                headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '3600'
-                }
-            )
-
-        api_key = OPENAI_API_KEY.value
-        assistant_id = "asst_dXiCpxEc4Nfu2INAoKgDLOgN"
-        
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        request_json = req.get_json()
-        if not request_json or 'message' not in request_json:
-            return https_fn.Response(
-                json.dumps({'error': 'Invalid request'}),
-                status=400,
-                headers={'Access-Control-Allow-Origin': '*'}
-            )
-
-        user_message = request_json['message']
-        thread_id = request_json.get('threadId')
-
-        # Create a new thread if none exists
-        if not thread_id:
-            thread = client.beta.threads.create()
-            thread_id = thread.id
-        
-        # Add message to thread
+        # Add user message to thread
         client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=user_message
+            thread_id=thread_id, role="user", content=user_message
         )
-
-        # Create a run
+        
+        # Create a new run for the assistant
         run = client.beta.threads.runs.create(
             thread_id=thread_id,
-            assistant_id=assistant_id
+            assistant_id=assistant_id,
         )
-
-        # Poll for completion or required actions
+        run_id = run.id
+        
+        # Poll for the run's completion or required actions
         while True:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
             
             if run.status == "requires_action":
                 tool_outputs = []
@@ -247,40 +290,33 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
                             "output": result
                         })
                 
+                # Submit tool outputs
                 if tool_outputs:
                     run = client.beta.threads.runs.submit_tool_outputs(
                         thread_id=thread_id,
-                        run_id=run.id,
+                        run_id=run_id,
                         tool_outputs=tool_outputs
                     )
-                    continue
-
-            if run.status == "completed":
+                    print(tool_outputs)
+                    continue  # Continue polling for completion
+                    
+            if run.completed_at:
+                # Retrieve the assistant's response
                 messages = client.beta.threads.messages.list(thread_id=thread_id)
-                response = messages.data[0].content[0].text.value
-                return https_fn.Response(
-                    json.dumps({
-                        'response': response,
-                        'threadId': thread_id
-                    }),
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
-
-            if run.status == "failed":
-                return https_fn.Response(
-                    json.dumps({
-                        'error': 'Assistant run failed',
-                        'threadId': thread_id
-                    }),
-                    status=500,
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
-
-            time.sleep(0.5)
-
+                last_message = messages.data[0]  # Get the latest assistant response
+                response_text = last_message.content[0].text.value  # Correctly parse the response
+                print(f"Assistant Response: {response_text}")  # Display the response
+                break
+                
+            time.sleep(sleep_interval)
+            
     except Exception as e:
-        return https_fn.Response(
-            json.dumps({'error': str(e)}),
-            status=500,
-            headers={'Access-Control-Allow-Origin': '*'}
-        )
+        logging.error(f"Error occurred: {e}")
+
+# === Main Loop ===
+while True:
+    user_msg = input("Talk to the AI assistant (type 'quit' to exit): ")
+    if user_msg.lower() == 'quit':
+        break
+    wait_for_run_completion(client, thread_id, assistant_id, user_msg)
+    
