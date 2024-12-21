@@ -1,154 +1,217 @@
-/* Dark theme for AI Advisor */
+/* Base styles */
 body {
-    background-color: #121212;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 100vh;
-    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  }
-  
-  .ai-advisor-container {
-    max-width: 1000px;
-    width: 100%;
-    margin: 0 auto;
-    border: 1px solid #333;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-    background-color: #1a1a1a;
-    color: #e0e0e0;
-  }
-  
-  .chat-header {
-    background-color: #2a2a2a;
-    padding: 15px;
-    text-align: center;
-    border-bottom: 1px solid #333;
-  }
-  
-  .chat-header h2 {
-    margin: 0;
-    color: #e0e0e0;
-    font-weight: 600;
-  }
-  
-  .chat-messages {
-    height: 600px;
-    overflow-y: auto;
-    padding: 20px;
-    background-color: #121212;
-  }
-  
-  .message {
-    display: flex;
-    align-items: flex-start;
-    margin-bottom: 15px;
-    gap: 10px;
-    color: #e0e0e0;
-  }
-  
-  .message-content {
-    background-color: #2a2a2a;
-    color: #e0e0e0;
-    padding: 6px 15px;
-    border-radius: 12px;
-    max-width: 80%;
-    line-height: 1.5;
-  }
-  
-  .user-message {
-    flex-direction: row-reverse;
-    text-align: right;
-  }
-  
-  .user-message .message-content {
-    background-color: #1a3d5a;
-    color: #e0e0e0;
-  }
-  
-  .ai-message {
-    text-align: left;
-  }
-  
-  .chat-input {
-    display: flex;
-    padding: 15px;
-    background-color: #2a2a2a;
-    border-top: 1px solid #333;
-  }
-  
-  .chat-input input {
-    flex-grow: 1;
-    padding: 10px;
-    border: 1px solid #444;
-    border-radius: 8px;
-    margin-right: 10px;
-    font-size: 16px;
-    background-color: #121212;
-    color: #e0e0e0;
-  }
-  
-  .chat-input button {
-    background-color: #0056b3;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 15px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.3s ease;
-  }
-  
-  .chat-input button:hover {
-    background-color: #003d82;
-  }
-  
-  /* Scrollbar styling for dark theme */
-  .chat-messages::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .chat-messages::-webkit-scrollbar-track {
-    background: #2a2a2a;
-  }
-  
-  .chat-messages::-webkit-scrollbar-thumb {
-    background: #555;
-    border-radius: 4px;
-  }
-  
-  .chat-messages::-webkit-scrollbar-thumb:hover {
-    background: #777;
-  }
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background-color: #343541;
+}
 
-  .loading-dots {
-    display: inline-block;
-  }
-  
-  .loading-dots:after {
-    content: '.';
-    animation: dots 1.5s steps(5, end) infinite;
-  }
-  
-  @keyframes dots {
-    0%, 20% { content: '.'; }
-    40% { content: '..'; }
-    60% { content: '...'; }
-    80%, 100% { content: ''; }
-  }
-  
-  /* Make sure the input and button are properly styled when disabled */
-  .chat-input input:disabled {
-    background-color: #2A2A2A;
-    cursor: not-allowed;
-  }
-  
-  .chat-input button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 260px;
+  background-color: #202123;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #4d4d4f;
+}
+
+.sidebar-top {
+  flex-grow: 1;
+  padding: 8px;
+}
+
+.new-chat-button {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #4d4d4f;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-bottom: 16px;
+}
+
+.new-chat-button:hover {
+  background-color: #2d2d2e;
+}
+
+.sidebar-bottom {
+  padding: 12px;
+  border-top: 1px solid #4d4d4f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  background-color: #C9592D;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 500;
+}
+
+.user-name {
+  color: #fff;
+  font-size: 14px;
+}
+
+.logout-button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+}
+
+.logout-button:hover {
+  background-color: #2d2d2e;
+}
+
+/* Chat container styles */
+.chat-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #343541;
+}
+
+.chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 24px 0;
+}
+
+.message {
+  padding: 24px 8px;
+}
+
+.message-wrapper {
+  max-width: 768px;
+  margin: 0 auto;
+  display: flex;
+  gap: 24px;
+}
+
+.message.user-message {
+  background-color: #444654;
+}
+
+.message-icon {
+  color: #fff;
+  opacity: 0.8;
+}
+
+.message-content {
+  color: #ececf1;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Input styles */
+.chat-input-container {
+  padding: 24px;
+  background-color: #343541;
+  border-top: 1px solid #4d4d4f;
+}
+
+.input-wrapper {
+  max-width: 768px;
+  margin: 0 auto;
+  position: relative;
+}
+
+input {
+  width: 100%;
+  padding: 16px;
+  padding-right: 48px;
+  background-color: #40414f;
+  border: 1px solid #4d4d4f;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 16px;
+}
+
+input:focus {
+  outline: none;
+  border-color: #C9592D;
+}
+
+.send-button {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.8;
+  transition: opacity 0.2s;
+}
+
+.send-button:hover {
+  opacity: 1;
+}
+
+.send-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Loading animation */
+.loading-dots {
+  display: inline-block;
+}
+
+.loading-dots:after {
+  content: '.';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60% { content: '...'; }
+  80%, 100% { content: ''; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #565869;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #676980;
+}

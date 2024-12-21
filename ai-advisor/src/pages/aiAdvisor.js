@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, User, Bot } from "lucide-react";
-import ReactMarkdown from 'react-markdown';
+import { Send, User, Bot, Plus, LogOut } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import "../styles/aiAdvisorStyles.css";
+import { auth } from "../firebase";
+import { signOut } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 const AIAdvisor = () => {
   const [messages, setMessages] = useState([
@@ -15,6 +18,16 @@ const AIAdvisor = () => {
   const [threadId, setThreadId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -27,7 +40,6 @@ const AIAdvisor = () => {
   const handleSendMessage = async () => {
     if (inputMessage.trim() === "" || isLoading) return;
 
-    // Add user message to the chat
     const newUserMessage = {
       id: messages.length,
       text: inputMessage,
@@ -35,20 +47,19 @@ const AIAdvisor = () => {
     };
 
     setMessages((prev) => [...prev, newUserMessage]);
-    setInputMessage("")
+    setInputMessage("");
     setIsLoading(true);
 
     try {
-      // Instead of using httpsCallable, make a direct fetch to the Cloud Function URL
-      const response = await fetch('https://cs-advisor-yjuaxbcwea-uc.a.run.app', {
-        method: 'POST',
+      const response = await fetch("https://cs-advisor-yjuaxbcwea-uc.a.run.app", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message: inputMessage,
-          threadId: threadId
-        })
+          threadId: threadId,
+        }),
       });
 
       if (!response.ok) {
@@ -56,14 +67,12 @@ const AIAdvisor = () => {
       }
 
       const data = await response.json();
-      console.log('Response data:', data);
+      console.log("Response data:", data);
 
-      // Update threadId
       if (data.threadId) {
         setThreadId(data.threadId);
       }
 
-      // Add AI response to the chat
       const newAIMessage = {
         id: messages.length + 1,
         text: data.response,
@@ -91,52 +100,100 @@ const AIAdvisor = () => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/"); // Redirect to the login page after logout
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  };
+
   return (
-    <div className="ai-advisor-container">
-      <div className="chat-header">
-        <h2>BSCS AI Advisor</h2>
-      </div>
-      <div className="chat-messages">
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`message ${
-              message.sender === "user" ? "user-message" : "ai-message"
-            }`}
-          >
-            {message.sender === "user" ? <User size={20} /> : <Bot size={20} />}
-            <div className="message-content">
-              {message.sender === "ai" ? (
-                <ReactMarkdown>{message.text}</ReactMarkdown>
-              ) : (
-                message.text
-              )}
+    <div className="app-container">
+      <aside className="sidebar">
+        <div className="sidebar-top">
+          <button className="new-chat-button">
+            <Plus size={16} />
+            New chat
+          </button>
+          <div className="chat-history">
+            {/* Chat history would go here */}
+          </div>
+        </div>
+        <div className="sidebar-bottom">
+          <div className="user-info">
+            <div className="user-avatar">
+              {currentUser ? currentUser.email?.[0].toUpperCase() : "?"}
+            </div>
+            <div className="user-name">
+              {currentUser ? currentUser.email || "Anonymous" : "Loading..."}
             </div>
           </div>
-        ))}
-        {isLoading && (
-          <div className="message ai-message">
-            <Bot size={20} />
-            <div className="message-content">
-              <span className="loading-dots">Thinking</span>
+          <button className="logout-button" onClick={handleLogout}>
+            <LogOut size={16} />
+          </button>
+        </div>
+      </aside>
+
+      <main className="chat-container">
+        <div className="chat-messages">
+          {messages.map((message) => (
+            <div
+              key={message.id}
+              className={`message ${
+                message.sender === "user" ? "user-message" : "ai-message"
+              }`}
+            >
+              <div className="message-wrapper">
+                <div className="message-icon">
+                  {message.sender === "user" ? <User size={24} /> : <Bot size={24} />}
+                </div>
+                <div className="message-content">
+                  {message.sender === "ai" ? (
+                    <ReactMarkdown>{message.text}</ReactMarkdown>
+                  ) : (
+                    message.text
+                  )}
+                </div>
+              </div>
             </div>
+          ))}
+          {isLoading && (
+            <div className="message ai-message">
+              <div className="message-wrapper">
+                <div className="message-icon">
+                  <Bot size={24} />
+                </div>
+                <div className="message-content">
+                  <span className="loading-dots">Thinking</span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div className="chat-input-container">
+          <div className="input-wrapper">
+            <input
+              type="text"
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Message your CS advisor..."
+              disabled={isLoading}
+            />
+            <button
+              className="send-button"
+              onClick={handleSendMessage}
+              disabled={isLoading || !inputMessage.trim()}
+            >
+              <Send size={16} />
+            </button>
           </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-      <div className="chat-input">
-        <input
-          type="text"
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Type your message..."
-          disabled={isLoading}
-        />
-        <button onClick={handleSendMessage} disabled={isLoading}>
-          <Send size={20} />
-        </button>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
