@@ -1,30 +1,66 @@
-from firebase_functions import https_fn
-from firebase_admin import initialize_app
-from firebase_functions.params import StringParam
-import json
-from openai import OpenAI
+import openai
+from dotenv import find_dotenv, load_dotenv
 import time
+import logging
+import json
+import ratemyprofessor
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Optional
+import pandas as pd
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
-# Initialize Firebase Admin
-initialize_app()
+# Load environment variables
+load_dotenv(find_dotenv())
 
-# Define configuration parameters
-OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
-ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_ppqkwkdwmE8KZl5aQ6R3jKA2")
+# Initialize OpenAI client
+client = openai.OpenAI()
+model = "gpt-4o"
 
-def get_course_prerequisites(course_id):
-    """Get course prerequisites"""
+# Cache the UVA school object
+UVA_SCHOOL = ratemyprofessor.get_school_by_name("University of Virginia")
+
+def get_course_prerequisites(course_id: str) -> str:
+    """Get prerequisites for a specific course."""
     prereqs = {
         "CS2100": ["CS1110", "CS1111", "CS1112", "CS1113"],
         "CS2150": ["CS2100"],
         "CS3140": ["CS2150"]
     }
     return json.dumps(prereqs.get(course_id, []))
+
+def get_professor_rating(professor_name: str) -> str:
+    """Get professor rating information from RateMyProfessor."""
+    try:
+        professor = ratemyprofessor.get_professor_by_school_and_name(UVA_SCHOOL, professor_name)
+        
+        if professor is None:
+            return json.dumps({
+                "error": "Professor not found",
+                "professor_name": professor_name
+            })
+        
+        return json.dumps({
+            "name": professor.name,
+            "department": professor.department,
+            "rating": professor.rating,
+            "difficulty": professor.difficulty,
+            "num_ratings": professor.num_ratings,
+            "would_take_again": professor.would_take_again,
+            "top_tags": professor.get_tags()[:3] if hasattr(professor, 'get_tags') else []
+        })
+    except Exception as e:
+        logging.error(f"Error retrieving professor information: {e}")
+        return json.dumps({
+            "error": f"Error retrieving professor information: {str(e)}",
+            "professor_name": professor_name
+        })
 
 def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "") -> Dict:
     """
@@ -253,87 +289,69 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
         
         return "\n".join(output)
 
-    # Return formatted output
-    return format_output(combined_data)
+    # Return both the structured data and formatted output
+    return {
+        'data': combined_data,
+        'formatted_output': format_output(combined_data)
+    }
 
-@https_fn.on_request()
-def cs_advisor(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
+
+def handle_tool_call(tool_call) -> Optional[Dict]:
+    """Handle individual tool calls and return the appropriate response."""
     try:
-        # Handle CORS preflight requests
-        if req.method == 'OPTIONS':
-            return https_fn.Response(
-                status=204,
-                headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '3600'
-                }
-            )
-
-        api_key = OPENAI_API_KEY.value
-        assistant_id = "asst_ppqkwkdwmE8KZl5aQ6R3jKA2"
+        function_name = tool_call.function.name
+        arguments = json.loads(tool_call.function.arguments)
         
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        request_json = req.get_json()
-        if not request_json or 'message' not in request_json:
-            return https_fn.Response(
-                json.dumps({'error': 'Invalid request'}),
-                status=400,
-                headers={'Access-Control-Allow-Origin': '*'}
+        if function_name == "get_course_prerequisites":
+            result = get_course_prerequisites(arguments["course_id"])
+        elif function_name == "get_professor_rating":
+            result = get_professor_rating(arguments["professor_name"])
+        elif function_name == "get_comprehensive_course_info":
+            result = get_comprehensive_course_info(
+                mnemonic=arguments.get("mnemonic", ""),
+                number=arguments.get("number", ""),
+                instructor=arguments.get("instructor", "")
             )
+        else:
+            logging.warning(f"Unknown function call: {function_name}")
+            return None
+            
+        return {
+            "tool_call_id": tool_call.id,
+            "output": json.dumps(result) if not isinstance(result, str) else result
+        }
+    except Exception as e:
+        logging.error(f"Error in tool call handling: {e}")
+        return None
 
-        user_message = request_json['message']
-        thread_id = request_json.get('threadId')
-
-        # Create a new thread if none exists
-        if not thread_id:
-            thread = client.beta.threads.create()
-            thread_id = thread.id
-        
-        # Add message to thread
+def wait_for_run_completion(client, thread_id: str, assistant_id: str, user_message: str, sleep_interval: int = 5):
+    """Handle communication with the assistant and wait for run completion."""
+    try:
+        # Add user message to thread
         client.beta.threads.messages.create(
             thread_id=thread_id,
             role="user",
             content=user_message
         )
-
-        # Create a run
+        
+        # Create and start the run
         run = client.beta.threads.runs.create(
             thread_id=thread_id,
             assistant_id=assistant_id
         )
-
-        # Poll for completion or required actions
+        
         while True:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+            run = client.beta.threads.runs.retrieve(
+                thread_id=thread_id,
+                run_id=run.id
+            )
             
             if run.status == "requires_action":
                 tool_outputs = []
                 for tool_call in run.required_action.submit_tool_outputs.tool_calls:
-                    print(f"Tool call name: {tool_call.function.name}")
-                    print(f"Tool call arguments: {tool_call.function.arguments}")
-                    if tool_call.function.name == "get_course_prerequisites":
-                        args = json.loads(tool_call.function.arguments)
-                        result = get_course_prerequisites(args["course_id"])
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": result
-                        })
-                    elif tool_call.function.name == "get_comprehensive_course_info":
-                        args = json.loads(tool_call.function.arguments)
-                        result = get_comprehensive_course_info(
-                            instructor=args.get("instructor", ""),
-                            mnemonic=args.get("mnemonic", ""),
-                            number=args.get("number", "")
-                        )
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": result
-                        })
+                    output = handle_tool_call(tool_call)
+                    if output:
+                        tool_outputs.append(output)
                 
                 if tool_outputs:
                     run = client.beta.threads.runs.submit_tool_outputs(
@@ -342,33 +360,103 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
                         tool_outputs=tool_outputs
                     )
                     continue
-
-            if run.status == "completed":
+                    
+            elif run.status == "completed":
                 messages = client.beta.threads.messages.list(thread_id=thread_id)
-                response = messages.data[0].content[0].text.value
-                return https_fn.Response(
-                    json.dumps({
-                        'response': response,
-                        'threadId': thread_id
-                    }),
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
-
-            if run.status == "failed":
-                return https_fn.Response(
-                    json.dumps({
-                        'error': 'Assistant run failed',
-                        'threadId': thread_id
-                    }),
-                    status=500,
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
-
-            time.sleep(0.5)
-
+                if messages.data:
+                    response = messages.data[0].content[0].text.value
+                    print("\nAssistant:", response)
+                break
+            elif run.status == "failed":
+                logging.error(f"Run failed: {run.last_error}")
+                print("\nAssistant: I encountered an error. Please try again.")
+                break
+            elif run.status == "expired":
+                logging.error("Run expired")
+                print("\nAssistant: The request timed out. Please try again.")
+                break
+                
+            time.sleep(sleep_interval)
+            
     except Exception as e:
-        return https_fn.Response(
-            json.dumps({'error': str(e)}),
-            status=500,
-            headers={'Access-Control-Allow-Origin': '*'}
+        logging.error(f"Error in run completion: {e}")
+        print("\nAssistant: I encountered an error. Please try again.")
+
+def main():
+    """Main function to run the AI advisor system."""
+    try:
+        # Initialize assistant
+        assistant = client.beta.assistants.create(
+            name="CS Advisor V3",
+            instructions="""You are a Computer Science advisor for students at the University of Virginia. 
+            Use the available tools to provide accurate and helpful information about courses, 
+            prerequisites, professors, and degree requirements. Be breif but informative. When recommended a schedule, make sure there are no conflicts""",
+            model=model,
+            tools=[
+                {"type": "file_search"},
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_course_prerequisites",
+                        "description": "Get prerequisites for a specific UVA CS course",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "course_id": {
+                                    "type": "string",
+                                    "description": "The course ID (e.g., CS2150)"
+                                }
+                            },
+                            "required": ["course_id"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_comprehensive_course_info",
+                        "description": "Fetches detailed course information including ratings, sections, and enrollment data. Use this tool when asked about the 'best' professor or for finding the 'best' class.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "mnemonic": {
+                                    "type": "string",
+                                    "description": "The course mnemonic (e.g., CS, APMA)"
+                                },
+                                "number": {
+                                    "type": "string",
+                                    "description": "The course number (e.g., 2150)"
+                                },
+                                "instructor": {
+                                    "type": "string",
+                                    "description": "Optional instructor name to filter results"
+                                }
+                            },
+                            "required": ["mnemonic", "number"]
+                        }
+                    }
+                },
+            ],
+            tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}}
         )
+        print(f"Assistant created: {assistant.id}")
+
+        # Create thread
+        thread = client.beta.threads.create()
+        
+        print("UVA CS AI Advisor initialized. Type 'quit' to exit.")
+        
+        while True:
+            user_input = input("\nYou: ").strip()
+            if user_input.lower() == 'quit':
+                break
+            if user_input:
+                wait_for_run_completion(client, thread.id, assistant.id, user_input)
+                
+    except Exception as e:
+        logging.error(f"Fatal error in main: {e}")
+        print("An error occurred. Please restart the application.")
+
+if __name__ == "__main__":
+    main()
+    

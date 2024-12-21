@@ -7,6 +7,8 @@ import ratemyprofessor
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
+from typing import Dict, Union, List
+import pandas as pd
 
 load_dotenv()
 
@@ -48,189 +50,278 @@ def get_professor_rating(professor_name):
             "error": f"Error retrieving professor information: {str(e)}"
         })
     
-def search_courses(instructor="", mnemonic="", number=""):
-    """Search for courses based on provided criteria"""
-    print("Starting course search...")
-    try:
-        base_url = "https://louslist.org/pagex.php"
+def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "") -> Dict:
+    """
+    Fetches and combines course information from both thecourseforum and louslist.
+    
+    Args:
+        mnemonic (str): Course mnemonic (e.g., 'CS', 'APMA')
+        number (str): Course number (e.g., '1110', '3080')
+        instructor (str, optional): Instructor name to filter by
         
-        params = {
-            "Type": "Search",
-            "Semester": "1252",
-            "iMnemonic": mnemonic,
-            "iNumber": number,
-            "iStatus": "",
-            "iType": "",
-            "iInstructor": instructor,
-            "iBuilding": "",
-            "iRoom": "",
-            "iMode": "",
-            "iDays": "",
-            "iTime": "",
-            "iDates": "",
-            "iUnits": "",
-            "iTitle": "",
-            "iTopic": "",
-            "iDescription": "",
-            "iDiscipline": "",
-            "iMinPosEnroll": "",
-            "iMaxPosEnroll": "",
-            "iMinCurEnroll": "",
-            "iMaxCurEnroll": "",
-            "iMinCurWaitlist": "",
-            "iMaxCurWaitlist": "",
-            "Submit": "Search for Classes"
-        }
+    Returns:
+        Dict containing combined course information from both sources
+    """
+    
+    def scrape_courseforum(mnemonic: str, number: str) -> Dict:
+        """Scrapes course information from thecourseforum"""
+        url = f"https://thecourseforum.com/course/{mnemonic}/{number}/"
         
-        # Remove empty parameters
-        params = {k: v for k, v in params.items() if v}
-        
-        # Construct URL
-        url = f"{base_url}?{urlencode(params)}"
-
-        # Fetch and parse data
-        response = requests.get(url)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        courses_dict = {}
-        current_course_number = None
-
-        # Parse the content
-        for row in soup.find_all('tr'):
-            # Course header row
-            course_num_cell = row.find('td', class_='CourseNum')
-            if course_num_cell:
-                course_number = course_num_cell.text.strip()
-                course_name_cell = row.find('td', class_='CourseName')
-                course_name = course_name_cell.text.strip() if course_name_cell else None
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            course_info = {}
+            
+            # Get course title and number
+            title_div = soup.select_one("div.d-md-flex.align-items-baseline")
+            if title_div:
+                course_info['course_code'] = title_div.h1.text.strip()
+                course_info['course_name'] = title_div.h2.text.strip()
+            
+            # Get course description
+            desc_card = soup.select_one("div.card div.card-body")
+            if desc_card:
+                course_info['description'] = desc_card.select_one("p.card-text").text.strip()
                 
-                if course_number not in courses_dict:
-                    courses_dict[course_number] = {
-                        'course_info': {
-                            'number': course_number,
-                            'name': course_name,
-                        },
-                        'sections': []
+                # Get prerequisites if they exist
+                prereq_div = desc_card.find('div', text=lambda t: t and 'Pre-Requisite(s):' in t)
+                if prereq_div:
+                    course_info['prerequisites'] = prereq_div.text.replace('Pre-Requisite(s):', '').strip()
+            
+            # Get instructor information
+            instructors = []
+            instructor_cards = soup.select("div.rating-card")
+            
+            for card in instructor_cards:
+                instructor = {}
+                instructor['name'] = card.select_one("#title").text.strip()
+                instructor['rating'] = float(card.select_one("#rating").text.strip())
+                instructor['difficulty'] = float(card.select_one("#difficulty").text.strip())
+                instructor['gpa'] = float(card.select_one("#gpa").text.strip())
+                instructor['sections'] = int(card.select_one("#times").text.strip())
+                instructor['last_taught'] = card.select_one("#recency").text.strip()
+                instructors.append(instructor)
+                
+            course_info['instructors'] = instructors
+            return course_info
+            
+        except Exception as e:
+            print(f"Error fetching data from thecourseforum: {e}")
+            return None
+
+    def scrape_louslist(mnemonic: str, number: str, instructor: str = "") -> Dict:
+        """Scrapes course information from louslist"""
+        try:
+            base_url = "https://louslist.org/pagex.php"
+            
+            params = {
+                "Type": "Search",
+                "Semester": "1252",
+                "iMnemonic": mnemonic,
+                "iNumber": number,
+                "iInstructor": instructor,
+                "Submit": "Search for Classes"
+            }
+            
+            # Remove empty parameters
+            params = {k: v for k, v in params.items() if v}
+            url = f"{base_url}?{urlencode(params)}"
+
+            response = requests.get(url)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            courses_dict = {}
+            current_course_number = None
+
+            for row in soup.find_all('tr'):
+                course_num_cell = row.find('td', class_='CourseNum')
+                if course_num_cell:
+                    course_number = course_num_cell.text.strip()
+                    course_name_cell = row.find('td', class_='CourseName')
+                    course_name = course_name_cell.text.strip() if course_name_cell else None
+                    
+                    if course_number not in courses_dict:
+                        courses_dict[course_number] = {
+                            'course_info': {
+                                'number': course_number,
+                                'name': course_name,
+                            },
+                            'sections': []
+                        }
+                    current_course_number = course_number
+                    continue
+
+                cells = row.find_all('td')
+                if len(cells) == 8 and cells[4].find('a') and current_course_number:
+                    enrollment = cells[4].text.strip().split('/')
+                    enrollment_current = int(enrollment[0]) if len(enrollment) > 0 else None
+                    enrollment_max = int(enrollment[1]) if len(enrollment) > 1 else None
+                    
+                    instructor_span = cells[5].find('span', onclick=lambda x: x and 'InstructorTip' in x)
+                    instructor = instructor_span.text.strip() if instructor_span else cells[5].text.strip()
+                    
+                    section_data = {
+                        'section_number': cells[1].text.strip(),
+                        'type': cells[2].text.strip(),
+                        'status': cells[3].text.strip(),
+                        'enrollment_current': enrollment_current,
+                        'enrollment_max': enrollment_max,
+                        'instructor': instructor,
+                        'schedule': cells[6].text.strip(),
+                        'location': cells[7].text.strip()
                     }
-                current_course_number = course_number
-                continue
+                    courses_dict[current_course_number]['sections'].append(section_data)
 
-            # Section row
-            cells = row.find_all('td')
-            if len(cells) == 8 and cells[4].find('a') and current_course_number:
-                enrollment = cells[4].text.strip().split('/')
-                enrollment_current = int(enrollment[0]) if len(enrollment) > 0 else None
-                enrollment_max = int(enrollment[1]) if len(enrollment) > 1 else None
-                
-                instructor_span = cells[5].find('span', onclick=lambda x: x and 'InstructorTip' in x)
-                instructor = instructor_span.text.strip() if instructor_span else cells[5].text.strip()
-                
-                section_data = {
-                    'section_number': cells[1].text.strip(),
-                    'type': cells[2].text.strip(),
-                    'status': cells[3].text.strip(),
-                    'enrollment_current': enrollment_current,
-                    'enrollment_max': enrollment_max,
-                    'instructor': instructor,
-                    'schedule': cells[6].text.strip(),
-                    'location': cells[7].text.strip()
+            return courses_dict.get(f"{mnemonic} {number}")
+            
+        except Exception as e:
+            print(f"Error fetching data from louslist: {e}")
+            return None
+
+    # Get data from both sources
+    courseforum_data = scrape_courseforum(mnemonic, number)
+    louslist_data = scrape_louslist(mnemonic, number, instructor)
+
+    # Combine the data
+    combined_data = {
+        'course_code': None,
+        'course_name': None,
+        'description': None,
+        'prerequisites': None,
+        'course_ratings': {},
+        'current_sections': []
+    }
+
+    # Add courseforum data
+    if courseforum_data:
+        combined_data.update({
+            'course_code': courseforum_data.get('course_code'),
+            'course_name': courseforum_data.get('course_name'),
+            'description': courseforum_data.get('description'),
+            'prerequisites': courseforum_data.get('prerequisites'),
+            'course_ratings': {
+                instructor['name']: {
+                    'rating': instructor['rating'],
+                    'difficulty': instructor['difficulty'],
+                    'gpa': instructor['gpa'],
+                    'last_taught': instructor['last_taught']
                 }
-                courses_dict[current_course_number]['sections'].append(section_data)
+                for instructor in courseforum_data.get('instructors', [])
+            }
+        })
 
-        # Convert data to human-readable format
-        output = []
-        for course in courses_dict.values():
-            course_text = f"\nCourse: {course['course_info']['number']} - {course['course_info']['name']}"
-            for section in course['sections']:
-                section_text = f"\nSection {section['section_number']}:"
-                section_text += f"\nInstructor: {section['instructor']}"
-                section_text += f"\nEnrollment: {section['enrollment_current']}/{section['enrollment_max']}"
-                section_text += f"\nSchedule: {section['schedule']}"
-                section_text += f"\nLocation: {section['location']}"
-                section_text += f"\nStatus: {section['status']}"
-                course_text += section_text
-            output.append(course_text)
-
-        print(output)
-
-        return "\n".join(output) if output else "No courses found matching the criteria."
+    # Add louslist data
+    if louslist_data:
+        # Update course info if not already present
+        if not combined_data['course_code']:
+            combined_data['course_code'] = louslist_data['course_info']['number']
+        if not combined_data['course_name']:
+            combined_data['course_name'] = louslist_data['course_info']['name']
         
-    except Exception as e:
-        return f"Error searching courses: {str(e)}"
+        combined_data['current_sections'] = louslist_data.get('sections', [])
+
+    def format_output(data: Dict) -> str:
+        """Formats the combined data into a readable string"""
+        output = []
+        
+        # Basic course information
+        output.append(f"Course: {data['course_code']} - {data['course_name']}")
+        
+        if data['description']:
+            output.append(f"\nDescription:\n{data['description']}")
+        
+        if data['prerequisites']:
+            output.append(f"\nPrerequisites:\n{data['prerequisites']}")
+        
+        # Instructor ratings
+        if data['course_ratings']:
+            output.append("\nInstructor Ratings:")
+            for name, ratings in data['course_ratings'].items():
+                output.append(f"\n{name}:")
+                output.append(f"  Rating: {ratings['rating']}/5.0")
+                output.append(f"  Difficulty: {ratings['difficulty']}/5.0")
+                output.append(f"  Average GPA: {ratings['gpa']}")
+                output.append(f"  Last Taught: {ratings['last_taught']}")
+        
+        # Current sections
+        if data['current_sections']:
+            output.append("\nCurrent Sections:")
+            for section in data['current_sections']:
+                output.append(f"\nSection {section['section_number']}:")
+                output.append(f"  Instructor: {section['instructor']}")
+                output.append(f"  Enrollment: {section['enrollment_current']}/{section['enrollment_max']}")
+                output.append(f"  Schedule: {section['schedule']}")
+                output.append(f"  Location: {section['location']}")
+                output.append(f"  Status: {section['status']}")
+        
+        return "\n".join(output)
+
+    # Return both the structured data and formatted output
+    return {
+        'data': combined_data,
+        'formatted_output': format_output(combined_data)
+    }
 
 # === Create the Assistant ===
-# ai_advisor = client.beta.assistants.create(
-#     name="CS Advisor V2",
-#     instructions="""You are a Computer Science advisor for students at the University of Virginia. 
-#     Use the file search tool for general questions, the prerequisites tool for course requirement questions,
-#     the professor rating tool to provide information about professors, and the course search tool to find 
-#     current course offerings and their details, including what classes certain proffesors teach.
-#     IMPORTANT: Use the file search tool whenever you are asked any question related to the BSCS degree.""",
-#     model=model,
-#     tools=[
-#         {"type": "file_search"},
-#         {
-#             "type": "function",
-#             "function": {
-#                 "name": "get_course_prerequisites",
-#                 "description": "Get prerequisites for a specific UVA CS course",
-#                 "parameters": {
-#                     "type": "object",
-#                     "properties": {
-#                         "course_id": {
-#                             "type": "string",
-#                             "description": "The course ID (e.g., CS2150)"
-#                         }
-#                     },
-#                     "required": ["course_id"]
-#                 }
-#             }
-#         },
-#         {
-#             "type": "function",
-#             "function": {
-#                 "name": "get_professor_rating",
-#                 "description": "Get RateMyProfessor information for a UVA professor",
-#                 "parameters": {
-#                     "type": "object",
-#                     "properties": {
-#                         "professor_name": {
-#                             "type": "string",
-#                             "description": "The professor's name"
-#                         }
-#                     },
-#                     "required": ["professor_name"]
-#                 }
-#             }
-#         },
-#         {
-#             "type": "function",
-#             "function": {
-#                 "name": "search_courses",
-#                 "description": "Search for UVA courses, professors, and their sections. Be sure to include the 'Type' and 'Enrollment' in your response.",
-#                 "parameters": {
-#                     "type": "object",
-#                     "properties": {
-#                         "instructor": {
-#                             "type": "string",
-#                             "description": "The instructor's name (optional)"
-#                         },
-#                         "mnemonic": {
-#                             "type": "string",
-#                             "description": "The course mnemonic (e.g., CS, APMA) (optional)"
-#                         },
-#                         "number": {
-#                             "type": "string",
-#                             "description": "The course number (e.g., 2150) (optional)"
-#                         }
-#                     }
-#                 }
-#             }
-#         }
-#     ],
-#     tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}},
-# )
+ai_advisor = client.beta.assistants.create(
+    name="CS Advisor V3",
+    instructions="""You are a Computer Science advisor for students at the University of Virginia. 
+    Use the file search tool for general questions, the prerequisites tool for course requirement questions,
+    the professor rating tool to provide information about professors, and the course search tool to find 
+    current course offerings and their details, including what classes certain proffesors teach.
+    IMPORTANT: Use the file search tool whenever you are asked any question related to the BSCS degree. 
+    """,
+    model=model,
+    tools=[
+        {"type": "file_search"},
+        {
+            "type": "function",
+            "function": {
+                "name": "get_course_prerequisites",
+                "description": "Get prerequisites for a specific UVA CS course",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "course_id": {
+                            "type": "string",
+                            "description": "The course ID (e.g., CS2150)"
+                        }
+                    },
+                    "required": ["course_id"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_comprehensive_course_info",
+                "description": "Fetches detailed course information from both thecourseforum and louslist, including historical ratings, current sections, enrollment data, and more.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "mnemonic": {
+                            "type": "string",
+                            "description": "The course mnemonic (e.g., CS, APMA)"
+                        },
+                        "number": {
+                            "type": "string",
+                            "description": "The course number (e.g., 2150, 3080)"
+                        },
+                        "instructor": {
+                            "type": "string",
+                            "description": "Optional instructor name to filter results"
+                        }
+                    },
+                    "required": ["mnemonic", "number"]
+                }
+            }
+        },
+    ],
+    tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}},
+)
 
 assistant_id = "asst_dXiCpxEc4Nfu2INAoKgDLOgN"
 print(f"Assistant ID: {assistant_id}")
@@ -278,9 +369,9 @@ def wait_for_run_completion(client, thread_id, assistant_id, user_message, sleep
                             "tool_call_id": tool_call.id,
                             "output": result
                         })
-                    elif tool_call.function.name == "search_courses":
+                    elif tool_call.function.name == "get_comprehensive_course_info":
                         args = json.loads(tool_call.function.arguments)
-                        result = search_courses(
+                        result = get_comprehensive_course_info(
                             instructor=args.get("instructor", ""),
                             mnemonic=args.get("mnemonic", ""),
                             number=args.get("number", "")

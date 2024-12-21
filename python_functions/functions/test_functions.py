@@ -39,7 +39,7 @@ if __name__ == "__main__":
     # test_cs_advisor("What are the prerequisites for CS2150?")
     
     print("\n=== Test 2: Asking about a professor ===")
-    test_cs_advisor("Which professors teach CHEM 1410?")
+    test_cs_advisor("Which professor has the highest rating that teaches CS 1110?")
     
     # If you want to test conversation continuity, uncomment and modify these lines:
     # thread_id = "your_thread_id_from_first_response"
