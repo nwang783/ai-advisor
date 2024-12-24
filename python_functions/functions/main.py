@@ -372,3 +372,90 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             status=500,
             headers={'Access-Control-Allow-Origin': '*'}
         )
+
+@https_fn.on_request()
+def make_new_thread(req: https_fn.Request) -> https_fn.Response:
+    """HTTP Cloud Function to create a new OpenAI thread."""
+    try:
+        if req.method == 'OPTIONS':
+            return https_fn.Response(
+                status=204,
+                headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Max-Age': '3600'
+                }
+            )
+
+        api_key = OPENAI_API_KEY.value
+        
+        # Initialize OpenAI client
+        client = OpenAI(api_key=api_key)
+
+        # Create a new thread
+        thread = client.beta.threads.create()
+        threadId = thread.id
+
+        return https_fn.Response(
+            json.dumps({'threadId': threadId}),
+            headers={'Access-Control-Allow-Origin': '*'}
+        )
+
+    except Exception as e:
+        return https_fn.Response(
+            json.dumps({'error': str(e)}),
+            status=500,
+            headers={'Access-Control-Allow-Origin': '*'}
+        )
+    
+@https_fn.on_request()
+def get_messages_from_thread(req: https_fn.Request) -> https_fn.Response:
+    """HTTP Cloud Function to get messages from an OpenAI thread."""
+    try:
+        if req.method == 'OPTIONS':
+            return https_fn.Response(
+                status=204,
+                headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Max-Age': '3600'
+                }
+            )
+
+        api_key = OPENAI_API_KEY.value
+        thread_id = req.args.get('threadId')
+
+        if not thread_id:
+            return https_fn.Response(
+                json.dumps({'error': 'Missing threadId'}),
+                status=400,
+                headers={'Access-Control-Allow-Origin': '*'}
+            )
+
+        # Initialize OpenAI client
+        client = OpenAI(api_key=api_key)
+
+        messages = client.beta.threads.messages.list(thread_id=thread_id)
+        messages = [
+            {
+                'role': message.role,
+                'content': message.content[0].text.value
+            }
+            for message in messages.data
+        ]
+
+        return https_fn.Response(
+            json.dumps({'messages': messages}),
+            headers={'Access-Control-Allow-Origin': '*'}
+        )
+
+    except Exception as e:
+        return https_fn.Response(
+            json.dumps({'error': str(e)}),
+            status=500,
+            headers={'Access-Control-Allow-Origin': '*'}
+        )
+
+    
