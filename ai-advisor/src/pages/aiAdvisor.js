@@ -1,16 +1,17 @@
 // AIAdvisor Component
 import React, { useState, useRef, useEffect } from "react";
-import { Send, User, Bot, Plus, LogOut } from "lucide-react";
+import { Send, User, Bot, Plus, LogOut, Pencil } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import "../styles/aiAdvisorStyles.css";
 import { auth, db } from "../firebase";
-import { doc, setDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, orderBy, getDocs, updateDoc } from 'firebase/firestore';
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
-import { Pencil } from "lucide-react";
 
-const ChatHistory = ({ currentUser, onThreadClick }) => {
+const ChatHistory = ({ currentUser, onThreadClick, selectedThreadId }) => {
   const [threads, setThreads] = useState([]);
+  const [editingThreadId, setEditingThreadId] = useState(null);
+  const [newName, setNewName] = useState("");
 
   useEffect(() => {
     const fetchThreads = async () => {
@@ -35,15 +36,76 @@ const ChatHistory = ({ currentUser, onThreadClick }) => {
     fetchThreads();
   }, [currentUser]);
 
+  const handleRename = async (threadId) => {
+    if (!newName.trim()) {
+      setEditingThreadId(null);
+      return;
+    }
+
+    try {
+      const threadRef = doc(db, 'threads', threadId);
+      await updateDoc(threadRef, {
+        name: newName.trim()
+      });
+
+      setThreads(threads.map(thread => 
+        thread.id === threadId 
+          ? { ...thread, name: newName.trim() }
+          : thread
+      ));
+
+      setEditingThreadId(null);
+      setNewName("");
+    } catch (error) {
+      console.error("Error renaming thread:", error);
+    }
+  };
+
+  const handleKeyPress = (e, threadId) => {
+    if (e.key === "Enter") {
+      handleRename(threadId);
+    } else if (e.key === "Escape") {
+      setEditingThreadId(null);
+      setNewName("");
+    }
+  };
+
   return (
     <div className="chat-history">
       {threads.map((thread) => (
         <div
           key={thread.id}
-          className="chat-history-item"
+          className={`chat-history-item ${selectedThreadId === thread.id ? 'selected' : ''}`}
           onClick={() => onThreadClick(thread.id)}
         >
-          <div className="chat-history-name">{thread.name}</div>
+          <div className="chat-history-content">
+            {editingThreadId === thread.id ? (
+              <input
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => handleKeyPress(e, thread.id)}
+                onBlur={() => handleRename(thread.id)}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                className="rename-input"
+              />
+            ) : (
+              <>
+                <div className="chat-history-name">{thread.name}</div>
+                <button 
+                  className="rename-button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingThreadId(thread.id);
+                    setNewName(thread.name);
+                  }}
+                >
+                  <Pencil size={14} />
+                </button>
+              </>
+            )}
+          </div>
           <div className="chat-history-date">
             {thread.createdAt?.toDate().toLocaleDateString()}
           </div>
@@ -265,7 +327,11 @@ const AIAdvisor = () => {
             <Plus size={16} />
             New chat
           </button>
-          <ChatHistory currentUser={currentUser} onThreadClick={handleThreadClick} />
+          <ChatHistory 
+            currentUser={currentUser} 
+            onThreadClick={handleThreadClick}
+            selectedThreadId={threadId}
+          />
         </div>
         <div className="sidebar-bottom">
           <div className="user-info">
@@ -348,7 +414,8 @@ const AIAdvisor = () => {
             <div className="popup-overlay">
               <div className="popup">
                 <h2>Instructions</h2>
-                <p>This is an AI tool designed to help UVA students build their class schedules. It has access to The Course Forum and Lou's List, and thus can utilize professor ratings and class times. Currently, you must identify a class based on its mnemonic and number. For example, "APMA 3080" instead of "Linear Algebra."</p>
+                <p>This is an AI tool designed to help UVA students build their class schedules. It has access to The Course Forum and Lou's List, and thus can utilize professor ratings and class times. Currently, you must identify a class based on its mnemonic and number. For example, "APMA 3080" instead of "Linear Algebra." </p>
+                <p>Note: The AI advisor only has access to courses offered Spring 2025.</p>
                 <p><strong>Example prompt:</strong><br />
                 I want to make a schedule for next semester. Here are the classes I want to take: APMA 3080, CS 2120, CS 2100, and ENGR 1020. Prioritize a good professor for APMA 3080. Do not worry about if the class is full. Make sure to also select a lab time for CS 2100. </p>
                 <p><strong>Feedback:</strong><br />

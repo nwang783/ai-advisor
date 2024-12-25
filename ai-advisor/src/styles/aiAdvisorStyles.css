@@ -422,3 +422,61 @@ input:focus {
 .popup button {
   margin-top: 16px;
 }
+/* Add these styles to your existing CSS file */
+
+.chat-history-item {
+  position: relative;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.chat-history-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.chat-history-item.selected {
+  background-color: rgba(0, 0, 0, 0.08);
+  border-color: #ececf1;
+  border-width: 1px;
+}
+
+.chat-history-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rename-button {
+  opacity: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.chat-history-item:hover .rename-button {
+  opacity: 1;
+}
+
+.rename-button:hover {
+  color: #000;
+}
+
+.rename-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  background-color: #40414f;
+}
+
+.rename-input:focus {
+  outline: none;
+  border-color: #666;
+}
