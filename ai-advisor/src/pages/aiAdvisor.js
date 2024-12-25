@@ -1,3 +1,4 @@
+// AIAdvisor Component
 import React, { useState, useRef, useEffect } from "react";
 import { Send, User, Bot, Plus, LogOut } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -8,7 +9,6 @@ import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import { Pencil } from "lucide-react";
 
-// Separate ChatHistory component
 const ChatHistory = ({ currentUser, onThreadClick }) => {
   const [threads, setThreads] = useState([]);
 
@@ -60,7 +60,7 @@ const AIAdvisor = () => {
   const [messages, setMessages] = useState([
     {
       id: 0,
-      text: "Hello! I'm your BSCS AI advisor. How can I help you today?",
+      text: "Hello! I'm your AI advisor. How can I help you today?",
       sender: "ai",
     },
   ]);
@@ -69,6 +69,11 @@ const AIAdvisor = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isPopupOpen, setIsPopupOpen] = useState(true);
+
+  const togglePopup = () => {
+    setIsPopupOpen(!isPopupOpen);
+  };
 
   const navigate = useNavigate();
 
@@ -76,6 +81,8 @@ const AIAdvisor = () => {
     const user = auth.currentUser;
     if (user) {
       setCurrentUser(user);
+    } else {
+      navigate("/");
     }
   }, []);
 
@@ -110,7 +117,7 @@ const AIAdvisor = () => {
       setMessages([
         {
           id: 0,
-          text: "Hello! I'm your BSCS AI advisor. How can I help you today?",
+          text: "Hello! I'm your AI advisor. How can I help you today?",
           sender: "ai",
         },
       ]);    
@@ -228,7 +235,6 @@ const AIAdvisor = () => {
         return;
       }
   
-      // Transform the messages from the API into our message format and reverse the order
       const formattedMessages = data.messages
         .reverse()
         .map((msg, index) => ({
@@ -237,7 +243,6 @@ const AIAdvisor = () => {
           sender: msg.role === 'assistant' ? 'ai' : 'user'
         }));
   
-      // Update messages state with the thread history
       setMessages(formattedMessages);
   
     } catch (error) {
@@ -333,6 +338,25 @@ const AIAdvisor = () => {
               <Send size={16} />
             </button>
           </div>
+          {/* Circular popup button */}
+          <button className="popup-circle-button" onClick={togglePopup}>
+            ?
+          </button>
+
+          {/* Popup content */}
+          {isPopupOpen && (
+            <div className="popup-overlay">
+              <div className="popup">
+                <h2>Instructions</h2>
+                <p>This is an AI tool designed to help UVA students build their class schedules. It has access to The Course Forum and Lou's List, and thus can utilize professor ratings and class times. Currently, you must identify a class based on its mnemonic and number. For example, "APMA 3080" instead of "Linear Algebra."</p>
+                <p><strong>Example prompt:</strong><br />
+                I want to make a schedule for next semester. Here are the classes I want to take: APMA 3080, CS 2120, CS 2100, and ENGR 1020. Prioritize a good professor for APMA 3080. Do not worry about if the class is full. Make sure to also select a lab time for CS 2100. </p>
+                <p><strong>Feedback:</strong><br />
+                Please reach out to Nathan Wang (hm2vg@virginia.edu) with any bugs or improvements.</p>
+                <button onClick={togglePopup}>Close</button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

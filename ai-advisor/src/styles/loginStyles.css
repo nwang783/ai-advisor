@@ -29,7 +29,8 @@
   position: absolute;
   bottom: 15%;
   left: 10%;
-  color: #fff;
+  color: #FFFF00;
+  background-color: #1a1a1a;
 }
 
 .hero-text h2 {

@@ -81,8 +81,8 @@ const Login = () => {
             className="hero-image" 
           />
           <div className="hero-text">
-            <h2>Capturing Moments,</h2>
-            <h2>Creating Memories</h2>
+            <h2>Under Construction...,</h2>
+            <h2>Pardon the bad UI</h2>
             <div className="hero-dots">
               <span className="dot"></span>
               <span className="dot"></span>
