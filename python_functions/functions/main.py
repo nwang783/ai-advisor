@@ -15,16 +15,7 @@ initialize_app()
 
 # Define configuration parameters
 OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
-ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_ppqkwkdwmE8KZl5aQ6R3jKA2")
-
-def get_course_prerequisites(course_id):
-    """Get course prerequisites"""
-    prereqs = {
-        "CS2100": ["CS1110", "CS1111", "CS1112", "CS1113"],
-        "CS2150": ["CS2100"],
-        "CS3140": ["CS2150"]
-    }
-    return json.dumps(prereqs.get(course_id, []))
+ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_VAAVCpAzSP1QhBwjQuHDKvHx")
 
 def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "") -> Dict:
     """
@@ -256,84 +247,68 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
     # Return formatted output
     return format_output(combined_data)
 
-@https_fn.on_request()
-def cs_advisor(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
+def check_for_conflicts(ai_response):
+    """Check for conflicts in the AI response"""
+    if not isinstance(ai_response, str):
+        return False, "Invalid response format"
+        
     try:
-        # Handle CORS preflight requests
-        if req.method == 'OPTIONS':
-            return https_fn.Response(
-                status=204,
-                headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '3600'
-                }
-            )
-
-        api_key = OPENAI_API_KEY.value
-        assistant_id = "asst_ppqkwkdwmE8KZl5aQ6R3jKA2"
+        response = json.loads(ai_response)
+        if not response.get("class_data"):
+            return False, "No conflicts detected"
+            
+        # Handle the actual structure where classes are nested under day_of_the_week
+        class_data = response["class_data"].get("day_of_the_week", {})
         
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        request_json = req.get_json()
-        if not request_json or 'message' not in request_json:
-            return https_fn.Response(
-                json.dumps({'error': 'Invalid request'}),
-                status=400,
-                headers={'Access-Control-Allow-Origin': '*'}
-            )
-
-        user_message = request_json['message']
-        thread_id = request_json.get('threadId')
-
-        # Create a new thread if none exists
-        if not thread_id:
-            thread = client.beta.threads.create()
-            thread_id = thread.id
+        for day in class_data:
+            times = {}
+            # Convert the dict of classes to a list of classes with their names
+            classes = [
+                {**class_info, "name": class_name} 
+                for class_name, class_info in class_data[day].items()
+            ]
+            
+            for course in classes:
+                if "time" not in course:
+                    return True, f"Course missing time field: {course['name']}"
+                    
+                if course["time"] not in times:
+                    times[course["time"]] = [course]
+                else:
+                    conflicting_course = times[course["time"]][0]
+                    return True, f"Conflict detected between {course['name']} and {conflicting_course['name']} at {course['time']}"
+                    
+        return False, "No conflicts detected"
         
-        # Add message to thread
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=user_message
-        )
+    except json.JSONDecodeError:
+        return False, "Invalid JSON format in response"
+    except Exception as e:
+        return False, f"Error checking for conflicts: {str(e)}"
 
-        # Create a run
-        run = client.beta.threads.runs.create(
-            thread_id=thread_id,
-            assistant_id=assistant_id
-        )
-
-        # Poll for completion or required actions
-        while True:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run.id)
+def wait_for_run_completion(thread_id, run_id, client):
+    """Wait for assistant run to complete"""
+    while True:
+        try:
+            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
             
             if run.status == "requires_action":
                 tool_outputs = []
                 for tool_call in run.required_action.submit_tool_outputs.tool_calls:
-                    print(f"Tool call name: {tool_call.function.name}")
-                    print(f"Tool call arguments: {tool_call.function.arguments}")
-                    if tool_call.function.name == "get_course_prerequisites":
+                    try:
                         args = json.loads(tool_call.function.arguments)
-                        result = get_course_prerequisites(args["course_id"])
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": result
-                        })
-                    elif tool_call.function.name == "get_comprehensive_course_info":
-                        args = json.loads(tool_call.function.arguments)
-                        result = get_comprehensive_course_info(
-                            instructor=args.get("instructor", ""),
-                            mnemonic=args.get("mnemonic", ""),
-                            number=args.get("number", "")
-                        )
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": result
-                        })
+                        if tool_call.function.name == "get_comprehensive_course_info":
+                            result = get_comprehensive_course_info(
+                                instructor=args.get("instructor", ""),
+                                mnemonic=args.get("mnemonic", ""),
+                                number=args.get("number", "")
+                            )
+                            tool_outputs.append({
+                                "tool_call_id": tool_call.id,
+                                "output": result
+                            })
+                    except json.JSONDecodeError:
+                        print(f"Invalid JSON in tool call arguments: {tool_call.function.arguments}")
+                        continue
                 
                 if tool_outputs:
                     run = client.beta.threads.runs.submit_tool_outputs(
@@ -345,30 +320,130 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
 
             if run.status == "completed":
                 messages = client.beta.threads.messages.list(thread_id=thread_id)
-                response = messages.data[0].content[0].text.value
-                return https_fn.Response(
-                    json.dumps({
-                        'response': response,
-                        'threadId': thread_id
-                    }),
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
-
+                if not messages.data:
+                    return "No response received"
+                return messages.data[0].content[0].text.value
+                
             if run.status == "failed":
-                return https_fn.Response(
-                    json.dumps({
-                        'error': 'Assistant run failed',
-                        'threadId': thread_id
-                    }),
-                    status=500,
-                    headers={'Access-Control-Allow-Origin': '*'}
-                )
+                return "Assistant run failed"
+                
+            # Add timeout logic
+            time.sleep(1)  # Prevent tight polling loop
+            
+        except Exception as e:
+            return f"Error in wait_for_run_completion: {str(e)}"
 
-            time.sleep(0.5)
+@https_fn.on_request()
+def cs_advisor(req: https_fn.Request) -> https_fn.Response:
+    """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
+    thread_id = None
+    
+    try:
+        if req.method == 'OPTIONS':
+            return https_fn.Response(
+                status=204,
+                headers={
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'POST',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                    'Access-Control-Max-Age': '3600'
+                }
+            )
+
+        # Validate required environment variables
+        api_key = OPENAI_API_KEY.value
+        assistant_id = ASSISTANT_ID.value
+        if not api_key or not assistant_id:
+            raise ValueError("Missing required environment variables")
+
+        # Initialize OpenAI client
+        client = OpenAI(api_key=api_key)
+
+        # Validate request
+        if not req.get_json():
+            raise ValueError("Request body is required")
+            
+        request_json = req.get_json()
+        if 'message' not in request_json:
+            raise ValueError("Message is required")
+
+        user_message = request_json['message']
+        thread_id = request_json.get('threadId')
+
+        # Create or retrieve thread
+        if not thread_id:
+            thread = client.beta.threads.create()
+            thread_id = thread.id
+        
+        # Add message and create run
+        client.beta.threads.messages.create(
+            thread_id=thread_id,
+            role="user",
+            content=user_message
+        )
+
+        run = client.beta.threads.runs.create(
+            thread_id=thread_id,
+            assistant_id=assistant_id
+        )
+
+        # Get assistant response and handle conflicts
+        assistant_response = wait_for_run_completion(thread_id, run.id, client)
+        print(f"Assistant response: {assistant_response}")
+        conflict, message = check_for_conflicts(assistant_response)
+        
+        max_retries = 3
+        retry_count = 0
+        
+        while conflict and retry_count < max_retries:
+            print("Conflict detected. Attempting to resolve.")
+            print(f"Conflict message: {message}")
+            client.beta.threads.messages.create(
+                thread_id=thread_id,
+                role="user",
+                content=f"Please resolve this conflict: {message}"
+            )
+            
+            run = client.beta.threads.runs.create(
+                thread_id=thread_id,
+                assistant_id=assistant_id
+            )
+            
+            assistant_response = wait_for_run_completion(thread_id, run.id, client)
+            conflict, message = check_for_conflicts(assistant_response)
+            retry_count += 1
+            
+        # Prepare response
+        try:
+            response_data = json.loads(assistant_response)
+            response_data['threadId'] = thread_id
+        except json.JSONDecodeError:
+            response_data = {
+                'message': assistant_response,
+                'threadId': thread_id,
+                'class_info': {},
+                'notes': 'Response was not in JSON format'
+            }
+        
+        return https_fn.Response(
+            json.dumps(response_data),
+            headers={
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+            }
+        )
 
     except Exception as e:
+        error_response = {
+            'error': str(e),
+            'message': 'An error occurred',
+            'class_info': {},
+            'notes': '',
+            'threadId': thread_id
+        }
+        
         return https_fn.Response(
-            json.dumps({'error': str(e)}),
+            json.dumps(error_response),
             status=500,
             headers={'Access-Control-Allow-Origin': '*'}
         )

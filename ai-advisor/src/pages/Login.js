@@ -41,7 +41,7 @@ const Login = () => {
       }
       
       // If authentication is successful, navigate to aiAdvisor page
-      navigate('/aiAdvisor');
+      navigate('/scheduleBuilder');
       
     } catch (err) {
       // Handle different Firebase auth errors

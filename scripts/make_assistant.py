@@ -7,8 +7,7 @@ import ratemyprofessor
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
-from typing import Dict, Union, List, Optional
-import pandas as pd
+from typing import Dict, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -25,15 +24,6 @@ model = "gpt-4o"
 
 # Cache the UVA school object
 UVA_SCHOOL = ratemyprofessor.get_school_by_name("University of Virginia")
-
-def get_course_prerequisites(course_id: str) -> str:
-    """Get prerequisites for a specific course."""
-    prereqs = {
-        "CS2100": ["CS1110", "CS1111", "CS1112", "CS1113"],
-        "CS2150": ["CS2100"],
-        "CS3140": ["CS2150"]
-    }
-    return json.dumps(prereqs.get(course_id, []))
 
 def get_professor_rating(professor_name: str) -> str:
     """Get professor rating information from RateMyProfessor."""
@@ -295,7 +285,6 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
         'formatted_output': format_output(combined_data)
     }
 
-
 def handle_tool_call(tool_call) -> Optional[Dict]:
     """Handle individual tool calls and return the appropriate response."""
     try:
@@ -387,30 +376,22 @@ def main():
     try:
         # Initialize assistant
         assistant = client.beta.assistants.create(
-            name="CS Advisor V3",
-            instructions="""You are a Computer Science advisor for students at the University of Virginia. 
-            Use the available tools to provide accurate and helpful information about courses, 
-            prerequisites, professors, and degree requirements. Be breif but informative. When recommended a schedule, make sure there are no conflicts""",
+            name="CS Advisor V4",
+            instructions="""
+            You are an AI advisor for students at the University of Virginia, specializing in helping students create accurate and conflict-free schedules. Your primary tasks are as follows:
+
+            1. Use the `get_comprehensive_course_info` tool to gather detailed information about courses, including times, locations, sections, enrollment, professors, and ratings.
+            2. Ensure that all schedules you recommend are free of time conflicts and adhere to the student's preferences.
+            3. When asked to recommend the 'best' professor or class, use the ratings data retrieved by the tool.
+            4. Clearly indicate any enrollment restrictions, prerequisites, or additional notes that might impact a student's choice.
+
+            Structure your output as follows:
+            - A brief summary of your recommendations.
+            - A detailed schedule  in JSON format organized by days of the week first, then have the each course name as a field of the day, and the professor, time, location, and rating as fields of each class.
+
+            """,
             model=model,
             tools=[
-                {"type": "file_search"},
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "get_course_prerequisites",
-                        "description": "Get prerequisites for a specific UVA CS course",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "course_id": {
-                                    "type": "string",
-                                    "description": "The course ID (e.g., CS2150)"
-                                }
-                            },
-                            "required": ["course_id"]
-                        }
-                    }
-                },
                 {
                     "type": "function",
                     "function": {
@@ -437,9 +418,34 @@ def main():
                     }
                 },
             ],
-            tool_resources={"file_search": {"vector_store_ids": ["vs_RTYajacnG1OYvedUFbSARhup"]}}
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "classInfoSchema",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "class_data": {
+                                "type": "object",
+                                "day_of_the_week": {
+                                    "type": "object",
+                                    "class_info": {
+                                        "prof": { "type": "string" },
+                                        "time": { "type": "string" },
+                                        "location": { "type": "string" },
+                                        "rating": { "type": "number" }
+                                    }
+                                }
+                            },
+                            "message": { "type": "string" }
+                        }
+                    }
+                }
+            }
         )
+
         print(f"Assistant created: {assistant.id}")
+
 
         # Create thread
         thread = client.beta.threads.create()
