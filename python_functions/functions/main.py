@@ -15,7 +15,7 @@ initialize_app()
 
 # Define configuration parameters
 OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
-ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_VAAVCpAzSP1QhBwjQuHDKvHx")
+ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_n4Wj8E7uUACcKvKX4uPGkhgZ")
 
 def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "") -> Dict:
     """
@@ -358,6 +358,8 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
 
         # Initialize OpenAI client
         client = OpenAI(api_key=api_key)
+        if client:
+            print("OpenAI client initialized successfully")
 
         # Validate request
         if not req.get_json():
@@ -375,6 +377,8 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             thread = client.beta.threads.create()
             thread_id = thread.id
         
+        print(f"Thread ID: {thread_id}")
+        
         # Add message and create run
         client.beta.threads.messages.create(
             thread_id=thread_id,
@@ -382,10 +386,16 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             content=user_message
         )
 
-        run = client.beta.threads.runs.create(
-            thread_id=thread_id,
-            assistant_id=assistant_id
-        )
+        try:
+            run = client.beta.threads.runs.create(
+                thread_id=thread_id,
+                assistant_id=assistant_id
+            )
+        except Exception as e:
+            print(f"Error creating assistant run: {str(e)}")
+            raise ValueError(f"Error creating assistant run: {str(e)}")
+
+        print(f"Run ID: {run.id}")
 
         # Get assistant response and handle conflicts
         assistant_response = wait_for_run_completion(thread_id, run.id, client)

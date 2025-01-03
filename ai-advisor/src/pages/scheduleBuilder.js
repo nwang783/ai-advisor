@@ -87,7 +87,7 @@ const ScheduleBuilder = () => {
             inputMessage += customInstructions;
         }
 
-        inputMessage = "I want to create a schedule for the following classes: APMA 3080, PHYS 1425, ENGR 1020, CS 2100, CS 2120, I want my classes to evenly be spread out across the five days of the week. Do not worry if the classes are full. "
+        inputMessage += "Put your detailed reasoning in the message."
         console.log(`Input message: ${inputMessage}`)
         return inputMessage;
     };
@@ -102,7 +102,7 @@ const ScheduleBuilder = () => {
         try {
             const inputMessage = await createInputMessage();
             // Remember to switch URL back to non-local when deploying
-            const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/cs_advisor", {
+            const response = await fetch("https://cs-advisor-yjuaxbcwea-uc.a.run.app", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
