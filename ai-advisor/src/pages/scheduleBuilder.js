@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import '../styles/scheduleBuilderStyles.css';
 import ScheduleRenderer from '../components/ScheduleRenderer';
+import Calendar from '../components/calendar';
+import MessageContainer from '../components/messageContainer';
 
 let CLASS_DATA = [];
 
@@ -17,6 +19,26 @@ fetch('/unique_classes.json')
     .then(data => {
         CLASS_DATA = data;
     });
+
+const Header = () => (
+    <header className="app-header">
+        <div className="header-content">
+        <div className="logo">
+            <h1>Schedule Builder</h1>
+        </div>
+        <nav className="nav-links">
+            <a href="/about">About</a>
+            <a href="/service">Service</a>
+            <a href="/faq">FAQ</a>
+            <a href="/contacts">Contacts</a>
+        </nav>
+        <div className="auth-buttons">
+            <button className="login-btn">Login</button>
+            <button className="signup-btn">Sign up</button>
+        </div>
+        </div>
+    </header>
+);
 
 const ScheduleBuilder = () => {
     const [user, setUser] = useState(null);
@@ -87,7 +109,7 @@ const ScheduleBuilder = () => {
             inputMessage += customInstructions;
         }
 
-        inputMessage += "Put your detailed reasoning in the message."
+        inputMessage += "Put your detailed reasoning in the message. Be sure to include reasoning for every class. DO NOT choose classes with overlapping times on the same day(s).";
         console.log(`Input message: ${inputMessage}`)
         return inputMessage;
     };
@@ -140,80 +162,105 @@ const ScheduleBuilder = () => {
     };
 
     return (
-        <div className="schedule-builder">
-            <div className="search-container">
-                <div className="search-box">
-                    <Search className="search-icon" />
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => handleSearch(e.target.value)}
-                        placeholder="Search for classes..."
-                        className="search-input"
-                    />
+        <div className="page-container">
+            <Header />
+            <div className="hero-section">
+                <div className="hero-content">
+                    <span className="badge">placeholder</span>
+                    <h1 className="hero-title">Your academic journey starts here</h1>
+                    <p className="hero-description">
+                        Build your perfect class schedule with our intuitive course planner,
+                        featuring smart recommendations and flexible customization options.
+                    </p>
                 </div>
-                
-                {searchResults.length > 0 && (
-                    <div className="search-results">
-                        {searchResults.map((course, index) => (
-                            <div
-                                key={index}
-                                className="search-result-item"
-                                onClick={() => addClass(course)}
-                            >
-                                {course.Mnemonic} {course.Number} - {course.Title}
-                            </div>
-                        ))}
-                    </div>
-                )}
             </div>
 
-            <div className="selected-classes">
-                <h3>Selected Classes ({classInfo.length}/7)</h3>
-                {classInfo.map((course, index) => (
-                    <div key={index} className="selected-class">
-                        <span>{course.Mnemonic} {course.Number} - {course.Title}</span>
-                        <button onClick={() => removeClass(index)} className="remove-btn">
-                            Remove
+            <div className="schedule-builder">
+                <div className="search-container">
+                    <div className="search-box">
+                        <Search className="search-icon" />
+                        <input
+                            type="text"
+                            value={searchTerm}
+                            onChange={(e) => handleSearch(e.target.value)}
+                            placeholder="Search for classes..."
+                            className="search-input"
+                        />
+                    </div>
+                    
+                    {searchResults.length > 0 && (
+                        <div className="search-results">
+                            {searchResults.map((course, index) => (
+                                <div
+                                    key={index}
+                                    className="search-result-item"
+                                    onClick={() => addClass(course)}
+                                >
+                                    {course.Mnemonic} {course.Number} - {course.Title}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="main-content">
+                    <div className="left-panel">
+                        <div className="selected-classes">
+                            <h3>Selected Classes ({classInfo.length}/7)</h3>
+                            {classInfo.map((course, index) => (
+                                <div key={index} className="selected-class">
+                                    <span>{course.Mnemonic} {course.Number} - {course.Title}</span>
+                                    <button onClick={() => removeClass(index)} className="remove-btn">
+                                        Remove
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="options-container">
+                            <div className="spread-option">
+                                <label>Schedule Spread:</label>
+                                <select 
+                                    value={spread} 
+                                    onChange={(e) => setSpread(e.target.value)}
+                                    className="spread-select"
+                                >
+                                    <option value="evenly">Evenly Spread</option>
+                                    <option value="minimally">Minimally Spread</option>
+                                    <option value="moderately">Moderately Spread</option>
+                                </select>
+                            </div>
+
+                            <div className="custom-instructions">
+                                <label>Custom Instructions:</label>
+                                <textarea
+                                    value={customInstructions}
+                                    onChange={(e) => setCustomInstructions(e.target.value)}
+                                    placeholder="Add any specific preferences (e.g., no classes before 9am)"
+                                    className="custom-input"
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={createSchedule} 
+                            className="create-schedule-btn"
+                            disabled={loading || classInfo.length === 0}
+                        >
+                            {loading ? "Creating Schedule..." : "Create Schedule"}
                         </button>
                     </div>
-                ))}
-            </div>
+                    <div className="right-panel">
+                            {message && (
+                                <MessageContainer message={message} />
+                            )}
+                    </div>
 
-            <div className="options-container">
-                <div className="spread-option">
-                    <label>Schedule Spread:</label>
-                    <select 
-                        value={spread} 
-                        onChange={(e) => setSpread(e.target.value)}
-                        className="spread-select"
-                    >
-                        <option value="evenly">Evenly Spread</option>
-                        <option value="minimally">Minimally Spread</option>
-                        <option value="moderately">Moderately Spread</option>
-                    </select>
-                </div>
-
-                <div className="custom-instructions">
-                    <label>Custom Instructions:</label>
-                    <textarea
-                        value={customInstructions}
-                        onChange={(e) => setCustomInstructions(e.target.value)}
-                        placeholder="Add any specific preferences (e.g., no classes before 9am)"
-                        className="custom-input"
-                    />
+                    <div className="calendar-container">
+                        {(schedule && !loading) && <Calendar scheduleData={schedule} />}
+                    </div>
                 </div>
             </div>
-
-            <button 
-                onClick={createSchedule} 
-                className="create-schedule-btn"
-                disabled={loading || classInfo.length === 0}
-            >
-                {loading ? "Creating Schedule..." : "Create Schedule"}
-            </button>
-
-            {(schedule && !loading) && <ScheduleRenderer scheduleData={schedule} />}
         </div>
     );
 };
