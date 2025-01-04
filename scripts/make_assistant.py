@@ -384,6 +384,7 @@ def main():
             2. Ensure that all schedules you recommend are free of time conflicts and adhere to the student's preferences.
             3. When asked to recommend the 'best' professor or class, use the ratings data retrieved by the tool.
             4. Clearly indicate any enrollment restrictions, prerequisites, or additional notes that might impact a student's choice.
+            5. If a class has meets on multiple days, ensure to put the class in the correct day(s) in the schedule.
 
             Structure your output as follows:
             - A brief summary of your recommendations.

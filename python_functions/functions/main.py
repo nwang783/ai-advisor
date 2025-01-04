@@ -251,39 +251,69 @@ def check_for_conflicts(ai_response):
     """Check for conflicts in the AI response"""
     if not isinstance(ai_response, str):
         return False, "Invalid response format"
-        
+
     try:
         response = json.loads(ai_response)
         if not response.get("class_data"):
             return False, "No conflicts detected"
-            
-        # Handle the actual structure where classes are nested under day_of_the_week
-        class_data = response["class_data"].get("day_of_the_week", {})
-        
-        for day in class_data:
-            times = {}
-            # Convert the dict of classes to a list of classes with their names
-            classes = [
-                {**class_info, "name": class_name} 
-                for class_name, class_info in class_data[day].items()
-            ]
-            
-            for course in classes:
-                if "time" not in course:
-                    return True, f"Course missing time field: {course['name']}"
-                    
-                if course["time"] not in times:
-                    times[course["time"]] = [course]
+
+        # Normalize the day keys
+        day_mapping = {
+            "mo": "Monday",
+            "tu": "Tuesday",
+            "we": "Wednesday",
+            "th": "Thursday",
+            "fr": "Friday"
+        }
+        class_data = {}
+
+        for key, value in response["class_data"].items():
+            normalized_day = day_mapping.get(key.lower(), key)
+            class_data[normalized_day] = value
+
+        # Process each day for conflicts
+        for day, courses in class_data.items():
+            times = []
+            # Convert classes into a list for processing
+            for class_name, details in courses.items():
+                if "time" in details:
+                    times.append({
+                        "name": class_name,
+                        "time": details["time"]
+                    })
                 else:
-                    conflicting_course = times[course["time"]][0]
-                    return True, f"Conflict detected between {course['name']} and {conflicting_course['name']} at {course['time']}"
-                    
+                    return True, f"Course missing time field: {class_name}"
+
+            # Check for conflicts in times
+            for i, course_a in enumerate(times):
+                for j, course_b in enumerate(times):
+                    if i >= j:
+                        continue
+                    if has_time_overlap(course_a["time"], course_b["time"]):
+                        return True, (
+                            f"Conflict detected between {course_a['name']} and "
+                            f"{course_b['name']} on {day} at overlapping times."
+                        )
+
         return False, "No conflicts detected"
-        
+
     except json.JSONDecodeError:
         return False, "Invalid JSON format in response"
     except Exception as e:
         return False, f"Error checking for conflicts: {str(e)}"
+
+def has_time_overlap(time_a, time_b):
+    """Check if two time ranges overlap"""
+    def parse_time(time_str):
+        from datetime import datetime
+        return datetime.strptime(time_str, "%I:%M%p")
+
+    try:
+        start_a, end_a = map(parse_time, time_a.lower().replace(" ", "").split("-"))
+        start_b, end_b = map(parse_time, time_b.lower().replace(" ", "").split("-"))
+        return max(start_a, start_b) < min(end_a, end_b)
+    except ValueError:
+        return False
 
 def wait_for_run_completion(thread_id, run_id, client):
     """Wait for assistant run to complete"""
@@ -401,6 +431,7 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
         assistant_response = wait_for_run_completion(thread_id, run.id, client)
         print(f"Assistant response: {assistant_response}")
         conflict, message = check_for_conflicts(assistant_response)
+        print(f"Conflict: {conflict}, Message: {message}")
         
         max_retries = 3
         retry_count = 0
