@@ -109,7 +109,7 @@ const ScheduleBuilder = () => {
             inputMessage += customInstructions;
         }
 
-        inputMessage += "Put your detailed reasoning in the message. Be sure to include reasoning for every class. DO NOT choose classes with overlapping times on the same day(s).";
+        inputMessage += "Put your detailed reasoning in the message!!!";
         console.log(`Input message: ${inputMessage}`)
         return inputMessage;
     };
@@ -143,7 +143,7 @@ const ScheduleBuilder = () => {
             console.log(data);
 
             if (data.threadId) {
-                setThreadId(data.threadId);
+                // setThreadId(data.threadId); //Temporarily commented out so we don't keep using the same thread
             }
 
             if (data.class_data) {

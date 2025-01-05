@@ -8,6 +8,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 from typing import Dict, Union, List
+from datetime import datetime as dt
 
 
 # Initialize Firebase Admin
@@ -247,49 +248,114 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
     # Return formatted output
     return format_output(combined_data)
 
-def check_for_conflicts(ai_response):
-    """Check for conflicts in the AI response"""
-    if not isinstance(ai_response, str):
-        return False, "Invalid response format"
-
-    try:
-        response = json.loads(ai_response)
-        if not response.get("class_data"):
-            return False, "No conflicts detected"
-
-        # Normalize the day keys
-        day_mapping = {
+class ScheduleValidator:
+    def __init__(self):
+        self.day_mapping = {
             "mo": "Monday",
             "tu": "Tuesday",
             "we": "Wednesday",
             "th": "Thursday",
             "fr": "Friday"
         }
-        class_data = {}
 
-        for key, value in response["class_data"].items():
-            normalized_day = day_mapping.get(key.lower(), key)
-            class_data[normalized_day] = value
+    def validate_schedule(self, ai_response, input_classes):
+        """
+        Comprehensive schedule validation that checks for:
+        1. Presence of all required courses
+        2. Time conflicts between courses
+        3. Data format and completeness
+        
+        Parameters:
+        ai_response (str or dict): The AI response containing schedule data
+        input_classes (list): List of required course names
+        
+        Returns:
+        tuple: (bool, list) indicating success/failure and a list of validation messages
+        """
+        try:
+            # Handle both string and dict inputs
+            if isinstance(ai_response, str):
+                response = json.loads(ai_response)
+            else:
+                response = ai_response
 
-        # Process each day for conflicts
-        for day, courses in class_data.items():
+            # Get the class data, handling both structures
+            if not response.get("class_data"):
+                return False, ["No class data found in response"]
+            
+            # If day_of_the_week exists, use it, otherwise use class_data directly
+            class_data = (response["class_data"].get("day_of_the_week") or 
+                         response["class_data"])
+            
+            if not class_data:
+                return False, ["No schedule data found in response"]
+
+            # Store the class data in the format we need
+            response["class_data"]["day_of_the_week"] = class_data
+
+            validation_messages = []
+            schedule_valid = True
+
+            # Check for all courses
+            courses_check = self._check_for_all_courses(response, input_classes)
+            if not courses_check[0]:
+                schedule_valid = False
+                validation_messages.append(courses_check[1])
+            else:
+                validation_messages.append("All required courses are present")
+
+            # Check for conflicts
+            conflicts_check = self._check_for_conflicts(response)
+            if conflicts_check[0]:  # True means conflict was found
+                schedule_valid = False
+                validation_messages.append(conflicts_check[1])
+            else:
+                validation_messages.append("No time conflicts detected")
+
+            return schedule_valid, validation_messages
+
+        except json.JSONDecodeError:
+            return False, ["Invalid JSON format in response"]
+        except Exception as e:
+            return False, [f"Error validating schedule: {str(e)}"]
+
+    def _check_for_all_courses(self, response, input_classes):
+        # """Check if all required courses are present in the schedule"""
+        # class_data = response["class_data"]
+        # found_courses = set()
+        # for day_data in class_data.values():
+        #     found_courses.update(day_data.keys())
+
+        # required_courses = set(input_classes)
+        # missing_courses = required_courses - found_courses
+
+        # if not missing_courses:
+        #     return True, "All required courses are present"
+        # else:
+        #     return False, f"Missing courses: {', '.join(missing_courses)}"
+        return True, "All required courses are present"
+
+    def _check_for_conflicts(self, response):
+        """Check for time conflicts between courses."""
+        class_data = response["class_data"]
+
+        for day, courses in class_data.items():  # Iterate over each day
             times = []
-            # Convert classes into a list for processing
-            for class_name, details in courses.items():
-                if "time" in details:
+            for course_name, details in courses.items():  # Iterate over courses for the day
+                if isinstance(details, dict) and "time" in details:  # Ensure details is a dictionary and has a 'time' field
                     times.append({
-                        "name": class_name,
+                        "name": course_name,
                         "time": details["time"]
                     })
-                else:
-                    return True, f"Course missing time field: {class_name}"
+                elif course_name == "Monday":
+                    break
 
-            # Check for conflicts in times
+            # Check for conflicts within the collected times
             for i, course_a in enumerate(times):
                 for j, course_b in enumerate(times):
-                    if i >= j:
+                    if i >= j:  # Skip self-comparison and redundant checks
                         continue
-                    if has_time_overlap(course_a["time"], course_b["time"]):
+                    if self._has_time_overlap(course_a["time"], course_b["time"]):
                         return True, (
                             f"Conflict detected between {course_a['name']} and "
                             f"{course_b['name']} on {day} at overlapping times."
@@ -297,23 +363,23 @@ def check_for_conflicts(ai_response):
 
         return False, "No conflicts detected"
 
-    except json.JSONDecodeError:
-        return False, "Invalid JSON format in response"
-    except Exception as e:
-        return False, f"Error checking for conflicts: {str(e)}"
+    def _has_time_overlap(self, time_a, time_b):
+        """Check if two time ranges overlap"""
+        def parse_time(time_str):
+            return dt.strptime(time_str, "%I:%M%p")
 
-def has_time_overlap(time_a, time_b):
-    """Check if two time ranges overlap"""
-    def parse_time(time_str):
-        from datetime import datetime
-        return datetime.strptime(time_str, "%I:%M%p")
-
-    try:
-        start_a, end_a = map(parse_time, time_a.lower().replace(" ", "").split("-"))
-        start_b, end_b = map(parse_time, time_b.lower().replace(" ", "").split("-"))
-        return max(start_a, start_b) < min(end_a, end_b)
-    except ValueError:
-        return False
+        try:
+            start_a, end_a = map(
+                parse_time,
+                time_a.lower().replace(" ", "").split("-")
+            )
+            start_b, end_b = map(
+                parse_time,
+                time_b.lower().replace(" ", "").split("-")
+            )
+            return max(start_a, start_b) < min(end_a, end_b)
+        except ValueError:
+            return False
 
 def wait_for_run_completion(thread_id, run_id, client):
     """Wait for assistant run to complete"""
@@ -428,21 +494,27 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
         print(f"Run ID: {run.id}")
 
         # Get assistant response and handle conflicts
+        validator = ScheduleValidator()
+        input_classes = ["APMA 3080", "CS 2100", "CS 2120", "PHYS 1425", "ENGR 1020"]
+
         assistant_response = wait_for_run_completion(thread_id, run.id, client)
         print(f"Assistant response: {assistant_response}")
-        conflict, message = check_for_conflicts(assistant_response)
-        print(f"Conflict: {conflict}, Message: {message}")
-        
+        is_valid, validation_messages = validator.validate_schedule(assistant_response, input_classes)
+        print("Validation Results:")
+        for msg in validation_messages:
+            print(f"- {msg}")
+
         max_retries = 3
         retry_count = 0
-        
-        while conflict and retry_count < max_retries:
-            print("Conflict detected. Attempting to resolve.")
-            print(f"Conflict message: {message}")
+
+        while not is_valid and retry_count < max_retries:
+            print("\nSchedule validation failed. Attempting to resolve issues.")
+            # Combine all validation messages into a clear request
+            issues_message = "\n".join(f"- {msg}" for msg in validation_messages)
             client.beta.threads.messages.create(
                 thread_id=thread_id,
                 role="user",
-                content=f"Please resolve this conflict: {message}"
+                content=f"Please resolve these issues in the schedule:\n{issues_message}"
             )
             
             run = client.beta.threads.runs.create(
@@ -451,8 +523,19 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             )
             
             assistant_response = wait_for_run_completion(thread_id, run.id, client)
-            conflict, message = check_for_conflicts(assistant_response)
+            print(f"Assistant response: {assistant_response}")
+            is_valid, validation_messages = validator.validate_schedule(assistant_response, input_classes)
+            
+            print("\nNew Validation Results:")
+            for msg in validation_messages:
+                print(f"- {msg}")
+            
             retry_count += 1
+
+        if not is_valid:
+            print(f"\nFailed to resolve schedule issues after {max_retries} attempts.")
+        else:
+            print("\nSchedule validation successful!")
             
         # Prepare response
         try:
@@ -482,39 +565,11 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             'notes': '',
             'threadId': thread_id
         }
-        
-        return https_fn.Response(
+
+        print(f"Error: {str(e)}")
+        return https_fn.Response(    
             json.dumps(error_response),
             status=500,
-            headers={'Access-Control-Allow-Origin': '*'}
-        )
-
-@https_fn.on_request()
-def make_new_thread(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function to create a new OpenAI thread."""
-    try:
-        if req.method == 'OPTIONS':
-            return https_fn.Response(
-                status=204,
-                headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '3600'
-                }
-            )
-
-        api_key = OPENAI_API_KEY.value
-        
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        # Create a new thread
-        thread = client.beta.threads.create()
-        threadId = thread.id
-
-        return https_fn.Response(
-            json.dumps({'threadId': threadId}),
             headers={'Access-Control-Allow-Origin': '*'}
         )
 

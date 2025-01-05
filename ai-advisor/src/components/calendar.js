@@ -32,8 +32,24 @@ const Calendar = ({ scheduleData }) => {
             normalized.class_data.day_of_the_week[standardizedDay] = data.class_data[key];
           }
         }
+
+        const profMap = {professor: 'prof'};
+
+        for (const day in normalized.class_data.day_of_the_week) {
+          for (const className in normalized.class_data.day_of_the_week[day]) {
+            const classDetails = normalized.class_data.day_of_the_week[day][className];
+            const standardizedDetails = {};
       
-        console.log(normalized);
+            for (const key in classDetails) {
+              const standardizedKey = profMap[key.toLowerCase()] || key;
+              standardizedDetails[standardizedKey] = classDetails[key];
+            }
+      
+            normalized.class_data.day_of_the_week[day][className] = standardizedDetails;
+          }
+        }
+      
+        console.log(`Normalized: ${JSON.stringify(normalized)}`);
         return normalized;
       };      
 
