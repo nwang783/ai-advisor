@@ -104,7 +104,7 @@ const ScheduleBuilder = () => {
         classInfo.forEach((classObj) => {
             inputMessage += `${classObj.Mnemonic} ${classObj.Number}, `;
         });
-        inputMessage += `I want my classes to ${spread} be spread out across the five days of the week. `;
+        inputMessage += `I want my classes to ${spread} be spread out across the five days of the week. Do not worry if the classes are full.`;
         if (customInstructions) {
             inputMessage += customInstructions;
         }
@@ -124,7 +124,7 @@ const ScheduleBuilder = () => {
         try {
             const inputMessage = await createInputMessage();
             // Remember to switch URL back to non-local when deploying
-            const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/cs_advisor", {
+            const response = await fetch("https://cs-advisor-yjuaxbcwea-uc.a.run.app", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -249,9 +249,12 @@ const ScheduleBuilder = () => {
                         >
                             {loading ? "Creating Schedule..." : "Create Schedule"}
                         </button>
+                        <p>Note: Currently, engagements are not supported. </p>
+                        <p>Please email feedback to Nathan Wang at hmg2vg@virginia.edu</p>
+                        {/* <p>{JSON.stringify(schedule)}</p> */}
                     </div>
                     <div className="right-panel">
-                            {message && (
+                            {(message && !loading) && (
                                 <MessageContainer message={message} />
                             )}
                     </div>

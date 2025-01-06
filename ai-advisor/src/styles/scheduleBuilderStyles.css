@@ -163,12 +163,12 @@ body {
 .search-container {
     position: relative;
     margin-bottom: 1.5rem;
-    max-width: 95%;
+    max-width: 100%;
 }
 
 .search-box {
     position: relative;
-    width: 100%;
+    width: stretch;
 }
 
 .search-icon {
@@ -348,3 +348,55 @@ body {
         font-size: 2rem;
     }
 }
+
+.schedule-container {
+    overflow-x: auto;
+    padding: 20px;
+  }
+  
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: 100px repeat(5, 1fr);
+    gap: 1px;
+    background: #eee;
+  }
+  
+  .header-cell {
+    background: #f8f9fa;
+    padding: 10px;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  .time-cell {
+    background: #f8f9fa;
+    padding: 10px;
+    text-align: right;
+  }
+  
+  .calendar-cell {
+    background: white;
+    min-height: 80px;
+    padding: 5px;
+  }
+  
+  .calendar-cell.has-class {
+    padding: 0;
+  }
+  
+  .class-content {
+    height: 100%;
+    padding: 8px;
+    border: 1px solid;
+    border-radius: 4px;
+  }
+  
+  .class-name {
+    font-weight: bold;
+    margin-bottom: 4px;
+  }
+  
+  .class-time, .class-location, .class-professor {
+    font-size: 0.9em;
+    margin-bottom: 2px;
+  }

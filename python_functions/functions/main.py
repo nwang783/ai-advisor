@@ -258,20 +258,7 @@ class ScheduleValidator:
             "fr": "Friday"
         }
 
-    def validate_schedule(self, ai_response, input_classes):
-        """
-        Comprehensive schedule validation that checks for:
-        1. Presence of all required courses
-        2. Time conflicts between courses
-        3. Data format and completeness
-        
-        Parameters:
-        ai_response (str or dict): The AI response containing schedule data
-        input_classes (list): List of required course names
-        
-        Returns:
-        tuple: (bool, list) indicating success/failure and a list of validation messages
-        """
+    def validate_schedule(self, ai_response):
         try:
             # Handle both string and dict inputs
             if isinstance(ai_response, str):
@@ -279,7 +266,6 @@ class ScheduleValidator:
             else:
                 response = ai_response
 
-            # Get the class data, handling both structures
             if not response.get("class_data"):
                 return False, ["No class data found in response"]
             
@@ -291,24 +277,16 @@ class ScheduleValidator:
                 return False, ["No schedule data found in response"]
 
             # Store the class data in the format we need
-            response["class_data"]["day_of_the_week"] = class_data
+            response["class_data"] = {"day_of_the_week": class_data}
 
             validation_messages = []
             schedule_valid = True
 
-            # Check for all courses
-            courses_check = self._check_for_all_courses(response, input_classes)
-            if not courses_check[0]:
-                schedule_valid = False
-                validation_messages.append(courses_check[1])
-            else:
-                validation_messages.append("All required courses are present")
-
             # Check for conflicts
-            conflicts_check = self._check_for_conflicts(response)
-            if conflicts_check[0]:  # True means conflict was found
+            conflicts = self._check_for_conflicts(response)
+            if conflicts:  # If we have any conflicts
                 schedule_valid = False
-                validation_messages.append(conflicts_check[1])
+                validation_messages.extend(conflicts)
             else:
                 validation_messages.append("No time conflicts detected")
 
@@ -319,49 +297,33 @@ class ScheduleValidator:
         except Exception as e:
             return False, [f"Error validating schedule: {str(e)}"]
 
-    def _check_for_all_courses(self, response, input_classes):
-        # """Check if all required courses are present in the schedule"""
-        # class_data = response["class_data"]
-        # found_courses = set()
-        # for day_data in class_data.values():
-        #     found_courses.update(day_data.keys())
-
-        # required_courses = set(input_classes)
-        # missing_courses = required_courses - found_courses
-
-        # if not missing_courses:
-        #     return True, "All required courses are present"
-        # else:
-        #     return False, f"Missing courses: {', '.join(missing_courses)}"
-        return True, "All required courses are present"
-
     def _check_for_conflicts(self, response):
         """Check for time conflicts between courses."""
-        class_data = response["class_data"]
+        conflicts = []
+        class_data = response["class_data"]["day_of_the_week"]
 
-        for day, courses in class_data.items():  # Iterate over each day
-            times = []
-            for course_name, details in courses.items():  # Iterate over courses for the day
-                if isinstance(details, dict) and "time" in details:  # Ensure details is a dictionary and has a 'time' field
-                    times.append({
+        for day, courses in class_data.items():
+            # Create list of course times for this day
+            day_schedule = []
+            for course_name, details in courses.items():
+                if isinstance(details, dict) and "time" in details:
+                    day_schedule.append({
                         "name": course_name,
                         "time": details["time"]
                     })
-                elif course_name == "Monday":
-                    break
 
-            # Check for conflicts within the collected times
-            for i, course_a in enumerate(times):
-                for j, course_b in enumerate(times):
-                    if i >= j:  # Skip self-comparison and redundant checks
-                        continue
-                    if self._has_time_overlap(course_a["time"], course_b["time"]):
-                        return True, (
-                            f"Conflict detected between {course_a['name']} and "
-                            f"{course_b['name']} on {day} at overlapping times."
+            # Check each course against every other course for that day
+            for i, course1 in enumerate(day_schedule):
+                for j, course2 in enumerate(day_schedule[i + 1:], i + 1):
+                    if self._has_time_overlap(course1["time"], course2["time"]):
+                        conflict_msg = (
+                            f"Conflict detected between {course1['name']} and "
+                            f"{course2['name']} on {day} at times "
+                            f"{course1['time']} and {course2['time']}"
                         )
+                        conflicts.append(conflict_msg)
 
-        return False, "No conflicts detected"
+        return conflicts
 
     def _has_time_overlap(self, time_a, time_b):
         """Check if two time ranges overlap"""
@@ -377,7 +339,7 @@ class ScheduleValidator:
                 parse_time,
                 time_b.lower().replace(" ", "").split("-")
             )
-            return max(start_a, start_b) < min(end_a, end_b)
+            return (start_a < end_b) and (start_b < end_a)
         except ValueError:
             return False
 
@@ -449,6 +411,9 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
         # Validate required environment variables
         api_key = OPENAI_API_KEY.value
         assistant_id = ASSISTANT_ID.value
+
+        print(f"Assistant ID: {assistant_id}")
+
         if not api_key or not assistant_id:
             raise ValueError("Missing required environment variables")
 
@@ -495,11 +460,10 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
 
         # Get assistant response and handle conflicts
         validator = ScheduleValidator()
-        input_classes = ["APMA 3080", "CS 2100", "CS 2120", "PHYS 1425", "ENGR 1020"]
 
         assistant_response = wait_for_run_completion(thread_id, run.id, client)
         print(f"Assistant response: {assistant_response}")
-        is_valid, validation_messages = validator.validate_schedule(assistant_response, input_classes)
+        is_valid, validation_messages = validator.validate_schedule(assistant_response)
         print("Validation Results:")
         for msg in validation_messages:
             print(f"- {msg}")
@@ -524,7 +488,7 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
             
             assistant_response = wait_for_run_completion(thread_id, run.id, client)
             print(f"Assistant response: {assistant_response}")
-            is_valid, validation_messages = validator.validate_schedule(assistant_response, input_classes)
+            is_valid, validation_messages = validator.validate_schedule(assistant_response)
             
             print("\nNew Validation Results:")
             for msg in validation_messages:

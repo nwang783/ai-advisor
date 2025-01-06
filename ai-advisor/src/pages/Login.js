@@ -74,7 +74,7 @@ const Login = () => {
   return (
     <div className="login-container">
       <div className="content-wrapper">
-        <div className="hero-section">
+        {/* <div className="hero-section">
           <img 
             src={heroImage} 
             alt="Landscape" 
@@ -89,7 +89,7 @@ const Login = () => {
               <span className="dot active"></span>
             </div>
           </div>
-        </div>
+        </div> */}
 
         <div className="form-section">
           <div className="form-container">
@@ -139,6 +139,7 @@ const Login = () => {
                   placeholder="Email"
                   value={formData.email}
                   onChange={handleInputChange}
+                  style={{ maxWidth: "370px" }}
                 />
               </div>
               <div className="input-field">
@@ -148,6 +149,7 @@ const Login = () => {
                   placeholder="Password"
                   value={formData.password}
                   onChange={handleInputChange}
+                  style={{ maxWidth: "370px" }}
                 />
               </div>
               
