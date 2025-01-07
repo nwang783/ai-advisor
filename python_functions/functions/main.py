@@ -392,22 +392,25 @@ def wait_for_run_completion(thread_id, run_id, client):
             return f"Error in wait_for_run_completion: {str(e)}"
 
 @https_fn.on_request()
-def cs_advisor(req: https_fn.Request) -> https_fn.Response:
+def schedule_builder(req: https_fn.Request) -> https_fn.Response:
     """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
-    thread_id = None
-    
-    try:
-        if req.method == 'OPTIONS':
-            return https_fn.Response(
-                status=204,
-                headers={
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'POST',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                    'Access-Control-Max-Age': '3600'
-                }
-            )
 
+    # Handle preflight (OPTIONS) requests
+    if req.method == "OPTIONS":
+        print("Handling preflight request")
+        return https_fn.Response(
+            status=204,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Max-Age": "3600"
+            }
+        )
+    
+    thread_id = None
+
+    try:
         # Validate required environment variables
         api_key = OPENAI_API_KEY.value
         assistant_id = ASSISTANT_ID.value
@@ -515,8 +518,10 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
         
         return https_fn.Response(
             json.dumps(response_data),
-            headers={
+             headers={
                 'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
                 'Content-Type': 'application/json'
             }
         )
@@ -534,14 +539,24 @@ def cs_advisor(req: https_fn.Request) -> https_fn.Response:
         return https_fn.Response(    
             json.dumps(error_response),
             status=500,
-            headers={'Access-Control-Allow-Origin': '*'}
+             headers={
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Content-Type': 'application/json'
+            }
         )
 
     except Exception as e:
         return https_fn.Response(
             json.dumps({'error': str(e)}),
             status=500,
-            headers={'Access-Control-Allow-Origin': '*'}
+             headers={
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Content-Type': 'application/json'
+            }
         )
     
 @https_fn.on_request()
@@ -592,5 +607,27 @@ def get_messages_from_thread(req: https_fn.Request) -> https_fn.Response:
             status=500,
             headers={'Access-Control-Allow-Origin': '*'}
         )
+
+@https_fn.on_request()
+def test_cors(req: https_fn.Request):
+    if req.method == "OPTIONS":
+        return https_fn.Response(
+            status=204,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Max-Age": "3600"
+            }
+        )
+    return https_fn.Response(
+        json.dumps({"message": "CORS test successful"}),
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Content-Type": "application/json"
+        }
+    )
 
     

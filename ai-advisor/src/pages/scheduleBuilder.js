@@ -3,7 +3,7 @@ import { auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import '../styles/scheduleBuilderStyles.css';
-import ScheduleRenderer from '../components/ScheduleRenderer';
+import LoadingAnimation from '../components/LoadingAnimation';
 import Calendar from '../components/calendar';
 import MessageContainer from '../components/messageContainer';
 
@@ -124,7 +124,7 @@ const ScheduleBuilder = () => {
         try {
             const inputMessage = await createInputMessage();
             // Remember to switch URL back to non-local when deploying
-            const response = await fetch("https://cs-advisor-yjuaxbcwea-uc.a.run.app", {
+            const response = await fetch("https://schedule-builder-yjuaxbcwea-uc.a.run.app", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -164,17 +164,6 @@ const ScheduleBuilder = () => {
     return (
         <div className="page-container">
             <Header />
-            <div className="hero-section">
-                <div className="hero-content">
-                    <span className="badge">placeholder</span>
-                    <h1 className="hero-title">Your academic journey starts here</h1>
-                    <p className="hero-description">
-                        Build your perfect class schedule with our intuitive course planner,
-                        featuring smart recommendations and flexible customization options.
-                    </p>
-                </div>
-            </div>
-
             <div className="schedule-builder">
                 <div className="search-container">
                     <div className="search-box">
@@ -247,7 +236,7 @@ const ScheduleBuilder = () => {
                             className="create-schedule-btn"
                             disabled={loading || classInfo.length === 0}
                         >
-                            {loading ? "Creating Schedule..." : "Create Schedule"}
+                            {loading ? <LoadingAnimation /> : "Create Schedule"}
                         </button>
                         <p>Note: Currently, engagements are not supported. </p>
                         <p>Please email feedback to Nathan Wang at hmg2vg@virginia.edu</p>
