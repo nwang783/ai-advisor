@@ -193,63 +193,65 @@ const ScheduleBuilder = () => {
                 </div>
 
                 <div className="main-content">
-                    <div className="left-panel">
-                        <div className="selected-classes">
-                            <h3>Selected Classes ({classInfo.length}/7)</h3>
-                            {classInfo.map((course, index) => (
-                                <div key={index} className="selected-class">
-                                    <span>{course.Mnemonic} {course.Number} - {course.Title}</span>
-                                    <button onClick={() => removeClass(index)} className="remove-btn">
-                                        Remove
-                                    </button>
+                    <div className="top-section">
+                        <div className="left-panel">
+                            <div className="selected-classes">
+                                <h3>Selected Classes ({classInfo.length}/7)</h3>
+                                {classInfo.map((course, index) => (
+                                    <div key={index} className="selected-class">
+                                        <span>{course.Mnemonic} {course.Number} - {course.Title}</span>
+                                        <button onClick={() => removeClass(index)} className="remove-btn">
+                                            Remove
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="options-container">
+                                <div className="spread-option">
+                                    <label>Schedule Spread:</label>
+                                    <select 
+                                        value={spread} 
+                                        onChange={(e) => setSpread(e.target.value)}
+                                        className="spread-select"
+                                    >
+                                        <option value="evenly">Evenly Spread</option>
+                                        <option value="minimally">Minimally Spread</option>
+                                        <option value="moderately">Moderately Spread</option>
+                                    </select>
                                 </div>
-                            ))}
-                        </div>
 
-                        <div className="options-container">
-                            <div className="spread-option">
-                                <label>Schedule Spread:</label>
-                                <select 
-                                    value={spread} 
-                                    onChange={(e) => setSpread(e.target.value)}
-                                    className="spread-select"
-                                >
-                                    <option value="evenly">Evenly Spread</option>
-                                    <option value="minimally">Minimally Spread</option>
-                                    <option value="moderately">Moderately Spread</option>
-                                </select>
+                                <div className="custom-instructions">
+                                    <label>Custom Instructions:</label>
+                                    <textarea
+                                        value={customInstructions}
+                                        onChange={(e) => setCustomInstructions(e.target.value)}
+                                        placeholder="Add any specific preferences (e.g., no classes before 9am)"
+                                        className="custom-input"
+                                    />
+                                </div>
                             </div>
 
-                            <div className="custom-instructions">
-                                <label>Custom Instructions:</label>
-                                <textarea
-                                    value={customInstructions}
-                                    onChange={(e) => setCustomInstructions(e.target.value)}
-                                    placeholder="Add any specific preferences (e.g., no classes before 9am)"
-                                    className="custom-input"
-                                />
-                            </div>
+                            <button 
+                                onClick={createSchedule} 
+                                className="create-schedule-btn"
+                                disabled={loading || classInfo.length === 0}
+                            >
+                                {loading ? <LoadingAnimation /> : "Create Schedule"}
+                            </button>
+                            <p>Note: Currently, engagements are not supported. </p>
+                            <p>Please email feedback to Nathan Wang at hmg2vg@virginia.edu</p>
                         </div>
 
-                        <button 
-                            onClick={createSchedule} 
-                            className="create-schedule-btn"
-                            disabled={loading || classInfo.length === 0}
-                        >
-                            {loading ? <LoadingAnimation /> : "Create Schedule"}
-                        </button>
-                        <p>Note: Currently, engagements are not supported. </p>
-                        <p>Please email feedback to Nathan Wang at hmg2vg@virginia.edu</p>
-                        {/* <p>{JSON.stringify(schedule)}</p> */}
-                    </div>
-                    <div className="right-panel">
-                            {(message && !loading) && (
-                                <MessageContainer message={message} />
-                            )}
+                        <div className="calendar-container">
+                            {(schedule && !loading) && <Calendar scheduleData={schedule} />}
+                        </div>
                     </div>
 
-                    <div className="calendar-container">
-                        {(schedule && !loading) && <Calendar scheduleData={schedule} />}
+                    <div className="bottom-section">
+                        {(message && !loading) && (
+                            <MessageContainer message={message} />
+                        )}
                     </div>
                 </div>
             </div>

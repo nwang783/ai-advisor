@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+const Modal = ({ isOpen, onClose, children }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        {children}
+        <button className="modal-close" onClick={onClose}>×</button>
+      </div>
+    </div>
+  );
+};
 
 const Calendar = ({ scheduleData }) => {
+  const [selectedClass, setSelectedClass] = useState(null);
+
   const normalizeScheduleData = (data) => {
-    // Data is already in the correct format, no need for complex normalization
     return data;
   };      
 
@@ -31,7 +45,6 @@ const Calendar = ({ scheduleData }) => {
       if (!details.time) return false;
       const [startTime] = details.time.split(' - ');
       
-      // Convert class time to 24-hour format
       let [classHour, classMinutes] = startTime.toLowerCase().split(':');
       classHour = parseInt(classHour);
       const isPM = classMinutes.includes('pm');
@@ -40,7 +53,6 @@ const Calendar = ({ scheduleData }) => {
       if (isPM && classHour !== 12) normalizedClassHour += 12;
       if (!isPM && classHour === 12) normalizedClassHour = 0;
 
-      // Convert time slot to 24-hour format
       const [timeHour, timePeriod] = time.split(' ');
       let normalizedTimeHour = parseInt(timeHour);
       if (timePeriod === 'PM' && normalizedTimeHour !== 12) normalizedTimeHour += 12;
@@ -52,6 +64,7 @@ const Calendar = ({ scheduleData }) => {
 
   return (
     <div className="schedule-container">
+      <p>Click each class for more details</p>
       <div className="calendar-grid">
         <div className="header-cell">Time</div>
         {days.map(day => (
@@ -72,7 +85,11 @@ const Calendar = ({ scheduleData }) => {
               const backgroundColor = generatePastelColor(className);
 
               return (
-                <div key={`${day}-${time}`} className="calendar-cell has-class">
+                <div 
+                  key={`${day}-${time}`} 
+                  className="calendar-cell has-class cursor-pointer"
+                  onClick={() => setSelectedClass({ className, details, day, time })}
+                >
                   <div
                     className="class-content"
                     style={{
@@ -80,15 +97,8 @@ const Calendar = ({ scheduleData }) => {
                       borderColor: backgroundColor.replace('90%', '80%')
                     }}
                   >
-                    <div className="class-name">{className}</div>
-                    <div className="class-time">{details.time}</div>
-                    <div className="class-location">{details.location}</div>
-                    {details.prof && (
-                      <div className="class-professor">
-                        {details.prof}
-                        {details.rating && ` (${details.rating})` || ' (N/A)'}
-                      </div>
-                    )}
+                    <div className="class-name truncate">{className}</div>
+                    <div className="class-time text-xs">{details.time.split(' - ')[0]}</div>
                   </div>
                 </div>
               );
@@ -96,6 +106,33 @@ const Calendar = ({ scheduleData }) => {
           </React.Fragment>
         ))}
       </div>
+
+      <Modal isOpen={!!selectedClass} onClose={() => setSelectedClass(null)}>
+        {selectedClass && (
+          <div>
+            <h2 className="modal-title">{selectedClass.className}</h2>
+            <div className="modal-info">
+              <div className="info-group">
+                <h3>Time</h3>
+                <p>{selectedClass.details.time}</p>
+              </div>
+              <div className="info-group">
+                <h3>Location</h3>
+                <p>{selectedClass.details.location}</p>
+              </div>
+              {selectedClass.details.prof && (
+                <div className="info-group">
+                  <h3>Instructor</h3>
+                  <p>
+                    {selectedClass.details.prof}
+                    {selectedClass.details.rating && ` (Rating: ${selectedClass.details.rating})` || ' (Rating: N/A)'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
