@@ -98,7 +98,8 @@ const Calendar = ({ scheduleData }) => {
                     }}
                   >
                     <div className="class-name truncate">{className}</div>
-                    <div className="class-time text-xs">{details.time.split(' - ')[0]}</div>
+                    <div className="class-time text-xs">{details.time}</div>
+                    <div className="class-time text-xs">{details.prof} ({details.rating ? details.rating : "N/A"})</div>
                   </div>
                 </div>
               );
