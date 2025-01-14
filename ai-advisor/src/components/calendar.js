@@ -64,7 +64,6 @@ const Calendar = ({ scheduleData }) => {
 
   return (
     <div className="schedule-container">
-      <p>Click each class for more details</p>
       <div className="calendar-grid">
         <div className="header-cell">Time</div>
         {days.map(day => (

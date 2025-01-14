@@ -19,6 +19,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding-left: 15px;
 }
 
 .logo h1 {
@@ -116,7 +117,9 @@
 .search-container {
     position: relative;
     margin-bottom: 1.5rem;
-    max-width: 100%;
+    max-width: 300px;
+    margin-left: 15px;
+
 }
 
 .search-box {
@@ -435,4 +438,181 @@
 .info-group p {
     font-size: 1rem;
     color: #333;
+}
+
+/* Modal overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+/* Modal content */
+.modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    width: 100%;
+    max-width: 380px;
+    position: relative;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Close button */
+.modal-close {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+/* Modal body */
+.modal-body {
+    margin-top: 0.5rem;
+}
+
+.modal-body h2 {
+    margin: 0 0 1.5rem 0;
+    color: #1a1a1a;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* Form styles */
+.modal-body form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.modal-body form > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.modal-body label {
+    color: #4a4a4a;
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.modal-body input {
+    padding: 0.75rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    width: 100%;
+    max-width: 350px;
+    transition: border-color 0.2s;
+}
+
+.modal-body input:focus {
+    outline: none;
+    border-color: #666;
+}
+
+/* Submit button */
+.modal-body button[type="submit"] {
+    background-color: #1a1a1a;
+    color: white;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.modal-body button[type="submit"]:hover {
+    background-color: #333;
+}
+
+/* Error states */
+.input-error {
+    border-color: #dc2626 !important;
+}
+
+.error-message {
+    color: #dc2626;
+    font-size: 0.8125rem;
+    margin-top: 0.25rem;
+}
+
+.error-tooltip {
+    background: #1a1a1a;
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    position: absolute;
+    margin-top: -0.25rem;
+}
+
+/* Auth switch link */
+.auth-switch {
+    margin-top: 1.25rem;
+    text-align: center;
+}
+
+.auth-switch button {
+    background: none;
+    border: none;
+    color: #666;
+    font-size: 0.875rem;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
+.auth-switch button:hover {
+    color: #333;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-overlay {
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+    animation: slideUp 0.3s ease-out;
 }
