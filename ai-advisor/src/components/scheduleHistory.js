@@ -4,6 +4,7 @@ import '../styles/scheduleBuilderStyles.css';
 
 const ScheduleHistory = ({ db, userId, onScheduleSelect }) => {
   const [schedules, setSchedules] = useState([]);
+  const [selectedScheduleId, setSelectedScheduleId] = useState(null);
 
   useEffect(() => {
     const fetchSchedules = async () => {
@@ -20,6 +21,7 @@ const ScheduleHistory = ({ db, userId, onScheduleSelect }) => {
           id: doc.id,
           ...doc.data()
         }));
+        schedulesList.sort((a, b) => b.createdAt - a.createdAt);
         setSchedules(schedulesList);
       } catch (error) {
         console.error("Error fetching schedules:", error);
@@ -29,6 +31,11 @@ const ScheduleHistory = ({ db, userId, onScheduleSelect }) => {
     fetchSchedules();
   }, [db, userId]);
 
+  const handleScheduleSelect = (schedule, id) => {
+    setSelectedScheduleId(id);
+    onScheduleSelect(schedule);
+  };
+
   return (
     <div className="schedule-history">
       <h3>Previous Schedules</h3>
@@ -36,13 +43,13 @@ const ScheduleHistory = ({ db, userId, onScheduleSelect }) => {
         {schedules.map((schedule, index) => (
           <div
             key={schedule.id}
-            onClick={() => onScheduleSelect(schedule.schedule)}
-            className="schedule-card"
+            onClick={() => handleScheduleSelect(schedule.schedule, schedule.id)}
+            className={`schedule-card ${selectedScheduleId === schedule.id ? 'selected' : ''}`}
           >
             <div>Schedule {index + 1}</div>
             <div>{schedule.semester}</div>
             <div>
-              {schedule.schedule.class_data?.length || 0} classes
+              Created at: {schedule.createdAt ? new Date(schedule.createdAt.seconds * 1000).toLocaleString() : ""}
             </div>
           </div>
         ))}

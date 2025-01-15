@@ -646,7 +646,13 @@
     border-radius: 0.375rem;
     cursor: pointer;
     transition: background-color 0.2s;
-  }
+}
+
+.schedule-card.selected {
+    background: #e0e7ff;  /* Light indigo background */
+    border: 2px solid #6366f1;  /* Indigo border */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
   
   .schedule-card:hover {
     background: #f3f4f6;

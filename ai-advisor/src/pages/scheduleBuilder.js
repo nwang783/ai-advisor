@@ -316,11 +316,20 @@ const ScheduleBuilder = () => {
 
             if (data.class_data) {
                 setSchedule(data);
+                // Create an array of input classes Mnemonic and Number
+                let inputClasses = [];
+                classInfo.forEach((classObj) => {
+                    inputClasses.push({ Mnemonic: classObj.Mnemonic, Number: classObj.Number });
+                });
                 await addDoc(collection(db, "schedules"), {
                     schedule: data,
                     createdBy: user.uid,
                     semester: "Spring 2025",
-                });
+                    createdAt: new Date(),
+                    inputClasses: inputClasses,
+                    timePreferences: [timePreferenceEarly, timePreferenceLate],
+                    customInstructions: customInstructions,
+                    });
                 console.log("Schedule set!")
             }
             if (data.message) {
