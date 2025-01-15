@@ -129,6 +129,16 @@ const Calendar = ({ scheduleData }) => {
                   </p>
                 </div>
               )}
+              <div className='info-group'>
+                <h3>Learn More</h3>
+                <a
+                  href={`https://thecourseforum.com/course/${selectedClass.className.split(' ')[0]}/${selectedClass.className.split(' ')[1]}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {`https://thecourseforum.com/course/${selectedClass.className.split(' ')[0]}/${selectedClass.className.split(' ')[1]}`}
+                </a>
+              </div>
             </div>
           </div>
         )}

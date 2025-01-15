@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from "../firebase";
+import { auth, db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
 import '../styles/scheduleBuilderStyles.css';
@@ -7,6 +7,8 @@ import LoadingAnimation from '../components/LoadingAnimation';
 import Calendar from '../components/calendar';
 import MessageContainer from '../components/messageContainer';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { collection, addDoc } from 'firebase/firestore';
+import ScheduleHistory from '../components/scheduleHistory';
 
 let CLASS_DATA = [];
 
@@ -24,7 +26,6 @@ fetch('/unique_classes.json')
 const ScheduleBuilder = () => {
     const [user, setUser] = useState(null);
     const [schedule, setSchedule] = useState(null);
-    const [scheduleNotes, setScheduleNotes] = useState(null);
     const [message, setMessage] = useState(null);
     const navigate = useNavigate();
     const [threadId, setThreadId] = useState(null);
@@ -32,7 +33,6 @@ const ScheduleBuilder = () => {
     const [customInstructions, setCustomInstructions] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [loading, setLoading] = useState(true);
-    const [spread, setSpread] = useState("evenly");
     const [searchResults, setSearchResults] = useState([]);
     const [timePreferenceEarly, setTimePreferenceEarly] = useState("");
     const [timePreferenceLate, setTimePreferenceLate] = useState("");
@@ -43,7 +43,7 @@ const ScheduleBuilder = () => {
             <header className="app-header">
                 <div className="header-content">
                     <div className="logo">
-                        <h1>Schedule Builder</h1>
+                        <h1>AI Schedule Builder</h1>
                     </div>
                     <nav className="nav-links">
                         <a href="/">Home</a>
@@ -266,7 +266,7 @@ const ScheduleBuilder = () => {
         classInfo.forEach((classObj) => {
             inputMessage += `${classObj.Mnemonic} ${classObj.Number}, `;
         });
-        inputMessage += `I want my classes to ${spread} be spread out across the five days of the week. Do not worry if the classes are full.`;
+        inputMessage += `I want my classes to evenly be spread out across the five days of the week. Do not worry if the classes are full.`;
         if (customInstructions) {
             inputMessage += customInstructions;
         }
@@ -315,7 +315,12 @@ const ScheduleBuilder = () => {
             }
 
             if (data.class_data) {
-                setSchedule(data);  
+                setSchedule(data);
+                await addDoc(collection(db, "schedules"), {
+                    schedule: data,
+                    createdBy: user.uid,
+                    semester: "Spring 2025",
+                });
                 console.log("Schedule set!")
             }
             if (data.message) {
@@ -359,7 +364,6 @@ const ScheduleBuilder = () => {
                         </div>
                     )}
                 </div>
-
                 <div className="main-content">
                     <div className="top-section">
                         <div className="left-panel">
@@ -440,6 +444,17 @@ const ScheduleBuilder = () => {
                             {(schedule && !loading) && <Calendar scheduleData={schedule} />}
                         </div>
                     </div>
+
+                    {user && (
+                    <ScheduleHistory 
+                        db={db} 
+                        userId={user.uid}
+                        onScheduleSelect={(scheduleData) => {
+                        setSchedule(scheduleData);
+                        setMessage(scheduleData.message);
+                        }}
+                    />
+                    )}
 
                     <div className="bottom-section">
                         {(message && !loading) && (
