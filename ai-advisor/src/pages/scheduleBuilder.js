@@ -264,7 +264,7 @@ const ScheduleBuilder = () => {
     const createInputMessage = async () => {
         let inputMessage = "I want to create a schedule for the following classes: ";
         classInfo.forEach((classObj) => {
-            inputMessage += `${classObj.Mnemonic} ${classObj.Number}, `;
+            inputMessage += `${classObj.Mnemonic} ${classObj.Number} - ${classObj.Title}, `;
         });
         inputMessage += `I want my classes to evenly be spread out across the five days of the week. Do not worry if the classes are full.`;
         if (customInstructions) {
@@ -291,8 +291,8 @@ const ScheduleBuilder = () => {
         setLoading(true);
         try {
             const inputMessage = await createInputMessage();
-            // Remember to switch URL back to non-local when deploying
-            const response = await fetch("https://schedule-builder-yjuaxbcwea-uc.a.run.app", {
+            // Remember to switch URL back to non-local when deploying. Local: http://127.0.0.1:5001/gpt-advisor/us-central1/schedule_builder. Production: https://schedule-builder-yjuaxbcwea-uc.a.run.app
+            const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/schedule_builder", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -445,7 +445,6 @@ const ScheduleBuilder = () => {
                             >
                                 {user ? loading ? <LoadingAnimation /> : "Create Schedule" : "Please log in to create a schedule"}
                             </button>
-                            <p>Note: Currently, engagements are not supported. </p>
                             <p>Please email feedback to Nathan Wang at hmg2vg@virginia.edu</p>
                         </div>
 

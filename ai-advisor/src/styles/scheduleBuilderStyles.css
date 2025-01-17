@@ -286,6 +286,7 @@
     background: white;
     min-height: 80px;
     padding: 5px;
+    max-width: 185px;
 }
 
 .calendar-cell.has-class {

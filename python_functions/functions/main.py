@@ -7,9 +7,8 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Optional
 from datetime import datetime as dt
-
 
 # Initialize Firebase Admin
 initialize_app()
@@ -18,7 +17,7 @@ initialize_app()
 OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
 ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_n4Wj8E7uUACcKvKX4uPGkhgZ")
 
-def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "") -> Dict:
+def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "", topic: str = None) -> Dict:
     """
     Fetches and combines course information from both thecourseforum and louslist.
     
@@ -80,11 +79,12 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
             print(f"Error fetching data from thecourseforum: {e}")
             return None
 
-    def scrape_louslist(mnemonic: str, number: str, instructor: str = "") -> Dict:
-        """Scrapes course information from louslist"""
+
+    def scrape_louslist(mnemonic: str, number: str, instructor: str = "", topic_name: Optional[str] = None) -> Dict:
+        """Scrapes course information from Lou's List, optionally filtering by topic name."""
         try:
             base_url = "https://louslist.org/pagex.php"
-            
+
             params = {
                 "Type": "Search",
                 "Semester": "1252",
@@ -93,26 +93,28 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
                 "iInstructor": instructor,
                 "Submit": "Search for Classes"
             }
-            
+
             # Remove empty parameters
             params = {k: v for k, v in params.items() if v}
             url = f"{base_url}?{urlencode(params)}"
 
             response = requests.get(url)
             response.raise_for_status()
-            
+
             soup = BeautifulSoup(response.text, 'html.parser')
             courses_dict = {}
             current_course_number = None
             last_section_num = None
+            current_topic = None  # Track the current topic
 
             for row in soup.find_all('tr'):
+                # Check for course number
                 course_num_cell = row.find('td', class_='CourseNum')
                 if course_num_cell:
                     course_number = course_num_cell.text.strip()
                     course_name_cell = row.find('td', class_='CourseName')
                     course_name = course_name_cell.text.strip() if course_name_cell else None
-                    
+
                     if course_number not in courses_dict:
                         courses_dict[course_number] = {
                             'course_info': {
@@ -124,49 +126,62 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
                     current_course_number = course_number
                     continue
 
+                # Check for topic rows - using the full class structure
+                row_classes = row.get('class', [])
+                if row_classes and ('SectionTopicOdd' in row_classes or 'SectionTopicEven' in row_classes):
+                    # Find the td with colspan="8" which contains the topic
+                    topic_cell = row.find('td', attrs={'colspan': '8'})
+                    if topic_cell and topic_cell.text.strip():
+                        current_topic = topic_cell.text.strip()
+                    continue
+
+                # Check for section rows
                 cells = row.find_all('td')
                 if len(cells) == 8 and cells[4].find('a') and current_course_number:
-                    enrollment = cells[4].text.strip().split('/')
-                    enrollment_current = int(enrollment[0]) if len(enrollment) > 0 else None
-                    enrollment_max = int(enrollment[1]) if len(enrollment) > 1 else None
-                    
-                    instructor_span = cells[5].find('span', onclick=lambda x: x and 'InstructorTip' in x)
-                    instructor = instructor_span.text.strip() if instructor_span else cells[5].text.strip()
-                    
-                    section_data = {
-                        'section_number': cells[1].text.strip(),
-                        'type': cells[2].text.strip(),
-                        'status': cells[3].text.strip(),
-                        'enrollment_current': enrollment_current,
-                        'enrollment_max': enrollment_max,
-                        'instructor': instructor,
-                        'schedule': cells[6].text.strip(),
-                        'location': cells[7].text.strip()
-                    }
-                    courses_dict[current_course_number]['sections'].append(section_data)
-                    last_section_num = cells[1].text.strip()
+                    # Only process section if topic matches or no topic filter specified
+                    if topic_name is None or (current_topic and topic_name.lower() in current_topic.lower()):
+                        enrollment = cells[4].text.strip().split('/')
+                        enrollment_current = int(enrollment[0]) if len(enrollment) > 0 else None
+                        enrollment_max = int(enrollment[1]) if len(enrollment) > 1 else None
 
-                elif len(cells) == 4 and current_course_number:
-                    
-                    instructor = cells[1].text.strip()
-                    
-                    section_data = {
-                        'section_number': last_section_num,
-                        'instructor': instructor,
-                        'schedule': cells[2].text.strip(),
-                        'location': cells[3].text.strip()
-                    }
-                    courses_dict[current_course_number]['sections'].append(section_data)
+                        instructor_span = cells[5].find('span', onclick=lambda x: x and 'InstructorTip' in x)
+                        instructor = instructor_span.text.strip() if instructor_span else cells[5].text.strip()
+
+                        section_data = {
+                            'section_number': cells[1].text.strip(),
+                            'type': cells[2].text.strip(),
+                            'status': cells[3].text.strip(),
+                            'enrollment_current': enrollment_current,
+                            'enrollment_max': enrollment_max,
+                            'instructor': instructor,
+                            'schedule': cells[6].text.strip(),
+                            'location': cells[7].text.strip(),
+                            'topic': current_topic
+                        }
+                        courses_dict[current_course_number]['sections'].append(section_data)
+                        last_section_num = cells[1].text.strip()
+
+                elif len(cells) == 4 and current_course_number and last_section_num:
+                    # Handle additional rows for sections, only if they belong to a matching topic
+                    if topic_name is None or (current_topic and topic_name.lower() in current_topic.lower()):
+                        section_data = {
+                            'section_number': last_section_num,
+                            'instructor': cells[1].text.strip(),
+                            'schedule': cells[2].text.strip(),
+                            'location': cells[3].text.strip(),
+                            'topic': current_topic
+                        }
+                        courses_dict[current_course_number]['sections'].append(section_data)
 
             return courses_dict.get(f"{mnemonic} {number}")
-            
+
         except Exception as e:
-            print(f"Error fetching data from louslist: {e}")
+            print(f"Error fetching data from Lou's List: {e}")
             return None
 
     # Get data from both sources
+    louslist_data = scrape_louslist(mnemonic, number, instructor, topic_name=topic)
     courseforum_data = scrape_courseforum(mnemonic, number)
-    louslist_data = scrape_louslist(mnemonic, number, instructor)
 
     # Combine the data
     combined_data = {
@@ -179,7 +194,10 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
     }
 
     # Add courseforum data
-    if courseforum_data:
+    if courseforum_data and louslist_data:
+        # Get unique instructors from louslist sections
+        louslist_instructors = {section['instructor'] for section in louslist_data['sections']}
+
         combined_data.update({
             'course_code': courseforum_data.get('course_code'),
             'course_name': courseforum_data.get('course_name'),
@@ -193,6 +211,7 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
                     'last_taught': instructor['last_taught']
                 }
                 for instructor in courseforum_data.get('instructors', [])
+                if instructor['name'] in louslist_instructors
             }
         })
 
@@ -242,6 +261,7 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
                 output.append(f"  Schedule: {section.get('schedule', 'N/A')}")
                 output.append(f"  Location: {section.get('location', 'N/A')}")
                 output.append(f"  Status: {section.get('status', 'N/A')}")
+                output.append(f"  Topic: {section.get('topic', 'N/A')}")
         
         return "\n".join(output)
 
@@ -345,6 +365,7 @@ class ScheduleValidator:
 
 def wait_for_run_completion(thread_id, run_id, client):
     """Wait for assistant run to complete"""
+    logs = []
     while True:
         try:
             run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
@@ -352,6 +373,7 @@ def wait_for_run_completion(thread_id, run_id, client):
             if run.status == "requires_action":
                 tool_outputs = []
                 for tool_call in run.required_action.submit_tool_outputs.tool_calls:
+                    logs.append(f"Tool call arguments: {tool_call.function.arguments}")
                     try:
                         args = json.loads(tool_call.function.arguments)
                         if tool_call.function.name == "get_comprehensive_course_info":
@@ -380,7 +402,7 @@ def wait_for_run_completion(thread_id, run_id, client):
                 messages = client.beta.threads.messages.list(thread_id=thread_id)
                 if not messages.data:
                     return "No response received"
-                return messages.data[0].content[0].text.value
+                return messages.data[0].content[0].text.value, logs
                 
             if run.status == "failed":
                 return "Assistant run failed"
@@ -391,7 +413,7 @@ def wait_for_run_completion(thread_id, run_id, client):
         except Exception as e:
             return f"Error in wait_for_run_completion: {str(e)}"
 
-@https_fn.on_request()
+@https_fn.on_request(timeout_sec=240)
 def schedule_builder(req: https_fn.Request) -> https_fn.Response:
     """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
 
@@ -464,7 +486,8 @@ def schedule_builder(req: https_fn.Request) -> https_fn.Response:
         # Get assistant response and handle conflicts
         validator = ScheduleValidator()
 
-        assistant_response = wait_for_run_completion(thread_id, run.id, client)
+        assistant_response, logs = wait_for_run_completion(thread_id, run.id, client)
+        print(f"Logs: {logs}")
         print(f"Assistant response: {assistant_response}")
         is_valid, validation_messages = validator.validate_schedule(assistant_response)
         print("Validation Results:")
@@ -489,7 +512,7 @@ def schedule_builder(req: https_fn.Request) -> https_fn.Response:
                 assistant_id=assistant_id
             )
             
-            assistant_response = wait_for_run_completion(thread_id, run.id, client)
+            assistant_response, _ = wait_for_run_completion(thread_id, run.id, client)
             print(f"Assistant response: {assistant_response}")
             is_valid, validation_messages = validator.validate_schedule(assistant_response)
             
