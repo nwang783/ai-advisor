@@ -405,13 +405,13 @@ def wait_for_run_completion(thread_id, run_id, client):
                 return messages.data[0].content[0].text.value, logs
                 
             if run.status == "failed":
-                return "Assistant run failed"
+                return "Assistant run failed", logs
                 
             # Add timeout logic
             time.sleep(1)  # Prevent tight polling loop
             
         except Exception as e:
-            return f"Error in wait_for_run_completion: {str(e)}"
+            return f"Error in wait_for_run_completion: {str(e)}", logs
 
 @https_fn.on_request(timeout_sec=240)
 def schedule_builder(req: https_fn.Request) -> https_fn.Response:

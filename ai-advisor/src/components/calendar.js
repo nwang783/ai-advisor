@@ -4,8 +4,8 @@ const Modal = ({ isOpen, onClose, children }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay active" onClick={onClose}>
+      <div className="modal-content active" onClick={e => e.stopPropagation()}>
         {children}
         <button className="modal-close" onClick={onClose}>×</button>
       </div>
@@ -17,6 +17,7 @@ const Calendar = ({ scheduleData }) => {
   const [selectedClass, setSelectedClass] = useState(null);
 
   const normalizeScheduleData = (data) => {
+    console.log(JSON.stringify(data));
     return data;
   };      
 
@@ -126,9 +127,21 @@ const Calendar = ({ scheduleData }) => {
                   <h3>Instructor</h3>
                   <p>
                     {selectedClass.details.prof}
-                    {selectedClass.details.rating && ` (Rating: ${selectedClass.details.rating})` || ' (Rating: N/A)'}
+                    {selectedClass.details.rating && (selectedClass.details.rating ? ` (Rating: ${selectedClass.details.rating})` : ' (Rating: N/A)')}
                   </p>
                 </div>
+              )}
+              {selectedClass.details.average_gpa && (
+              <div className="info-group">
+                <h3>Average GPA</h3>
+                <p>{selectedClass.details.average_gpa}</p>
+              </div>
+              )}
+              {selectedClass.details.difficulty && (
+              <div className="info-group">
+                <h3>Difficulty</h3>
+                <p>{selectedClass.details.difficulty}</p>
+              </div>
               )}
               <div className='info-group'>
                 <h3>Learn More</h3>

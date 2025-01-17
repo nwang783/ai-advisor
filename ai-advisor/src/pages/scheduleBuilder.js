@@ -292,7 +292,7 @@ const ScheduleBuilder = () => {
         try {
             const inputMessage = await createInputMessage();
             // Remember to switch URL back to non-local when deploying. Local: http://127.0.0.1:5001/gpt-advisor/us-central1/schedule_builder. Production: https://schedule-builder-yjuaxbcwea-uc.a.run.app
-            const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/schedule_builder", {
+            const response = await fetch("https://schedule-builder-yjuaxbcwea-uc.a.run.app", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
