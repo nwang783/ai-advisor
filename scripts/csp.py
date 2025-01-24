@@ -1,8 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
-from typing import Dict, Union, List, Optional
+from typing import Dict, Optional
 from datetime import datetime as dt
+import pandas as pd
+import re
 
 def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "", topic: str = None) -> Dict:
     """
@@ -253,11 +255,218 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
         return "\n".join(output)
 
     # Return formatted output
-    return format_output(combined_data)
+    return format_output(combined_data), combined_data
 
-# Example usage
-# Get all sections with topic "Art and Politics of Dreaming"
-info = get_comprehensive_course_info("EGMT", "1520", topic="Birds Aren't Real")
+class CSP:
+    def __init__(self, variables, domains, time_constaints=None):
+        self.variables = variables
+        self.domains = domains
+        self.final_schedule = {}
+        self.time_contraints = time_constaints
+        self.add_classes_with_labs()
 
-# Get all sections (no topic filter)
-# info = get_comprehensive_course_info("EGMT", "1520")
+    def parse_schedule(self, schedule_string):
+        if isinstance(schedule_string, list):
+            schedule_string = schedule_string[0]
+        """
+        Robust schedule parsing with multiple parsing strategies
+        
+        Learning Breakdown:
+        1. Uses regular expressions for flexible parsing
+        2. Handles multiple schedule formats
+        3. Provides detailed error information
+        """
+        # Regular expression to parse various schedule formats
+        # Breaks down the parsing into logical components
+        schedule_pattern = r'^(\w+)\s+(\d{1,2}:\d{2}(?:am|pm))\s*-\s*(\d{1,2}:\d{2}(?:am|pm))$'
+        
+        try:
+            # Attempt to match the schedule using regex
+            match = re.match(schedule_pattern, schedule_string)
+            
+            if not match:
+                # Attempt more flexible parsing for complex schedules
+                # Like those with multiple day abbreviations (MoWeFr)
+                more_flexible_pattern = r'^(\w+)\s+(\d{1,2}:\d{2}\s*(?:am|pm))\s*-\s*(\d{1,2}:\d{2}\s*(?:am|pm))$'
+                match = re.match(more_flexible_pattern, schedule_string)
+            
+            if not match:
+                raise ValueError(f"Cannot parse schedule format: {schedule_string}")
+            
+            # Extract components
+            days = [match.group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
+            start_time = self.format_time(match.group(2).strip())
+            end_time = self.format_time(match.group(3).strip())
+            
+            return {
+                'days': days,
+                'start_time': start_time,
+                'end_time': end_time,
+                'date': None  # Default for standard schedules
+            }
+        
+        except Exception as e:
+            # Comprehensive error handling
+            raise ValueError(f"Detailed parsing error for '{schedule_string}': {str(e)}")
+    
+    def format_time(self, time_string):
+        """
+        Intelligent time parsing with multiple strategies
+        
+        Teaching Points:
+        - Removes whitespace
+        - Handles variations in time input
+        - Provides clear error messages
+        """
+        # Remove any whitespace
+        time_string = time_string.replace(' ', '')
+        
+        try:
+            # Primary parsing strategy
+            return dt.strptime(time_string, "%I:%M%p").time()
+        except ValueError:
+            # Fallback parsing strategies
+            try:
+                # Try without colon
+                return dt.strptime(time_string, "%I%M%p").time()
+            except ValueError:
+                # Comprehensive error reporting
+                raise ValueError(f"Cannot parse time: {time_string}")
+    
+    def has_time_conflict(self, schedule1, schedule2):
+        """
+        Advanced conflict detection
+        - Checks for day overlap
+        - Handles both recurring and dated sessions
+        """
+        # If both have dates, check if they're the same
+        if schedule1.get('date') and schedule2.get('date'):
+            if schedule1['date'] != schedule2['date']:
+                return False
+        
+        # Check day overlap
+        shared_days = set(schedule1['days']) & set(schedule2['days'])
+        
+        if shared_days:
+            # Check time overlap
+            return not (schedule1['end_time'] <= schedule2['start_time'] or 
+                        schedule2['end_time'] <= schedule1['start_time']) 
+        
+        return False
+    
+    def check_for_conflicts(self, new_class, current_schedule):
+        """
+        Check if new class conflicts with existing schedule
+        """
+        # If the new class has multiple schedules, check all combinations
+        if isinstance(new_class, list):
+            return any(
+                self.check_for_conflicts(section, current_schedule) 
+                for section in new_class
+            )
+        
+        parsed_new_class = self.parse_schedule(new_class)
+        
+        for assigned_class in current_schedule.values():
+            parsed_assigned = self.parse_schedule(assigned_class)
+            if self.has_time_conflict(parsed_new_class, parsed_assigned):
+                return True
+            elif self.time_contraints:
+                if parsed_new_class['start_time'] <= self.time_contraints[0] or parsed_new_class['end_time'] >= self.time_contraints[1]:
+                    return True
+        return False
+    
+    def add_classes_with_labs(self):
+        """
+        Add lab sections as separate variables in the domains dictionary.
+        Remove corresponding lab sections from their original courses.
+        """
+        domains = self.domains.copy()  # Copy the domains to avoid modifying the original
+        for course, sections in list(domains.items()):  # Iterate over a copy of the dictionary
+            lab_sections = {}  # Dictionary to hold lab sections
+            lecture_sections = {}  # Dictionary to hold lecture sections
+
+            # Separate lecture and lab sections
+            for section, schedule in sections.items():
+                if section.startswith("1"):  # Assume lab sections start with "1"
+                    lab_sections[section] = schedule
+                else:
+                    lecture_sections[section] = schedule
+
+            # Update the course with only lecture sections
+            self.domains[course] = lecture_sections
+
+            # Add a new entry for lab sections if they exist
+            if lab_sections:
+                lab_course_key = f"{course}_lab"
+                self.variables.append(lab_course_key)
+                self.domains[lab_course_key] = lab_sections
+
+    def backtracking_search(self, schedule=None):
+        """
+        Backtracking search with support for complex domains
+        """
+
+        if schedule is None:
+            schedule = {}
+        
+        if len(schedule) == len(self.variables):
+            return schedule
+        
+        var = self.select_unassigned_variable(schedule)
+        
+        for section_code, section_schedules in self.domains[var].items():
+            # Handle single or multiple schedules for a section
+            schedules = section_schedules if isinstance(section_schedules, list) else [section_schedules]
+            
+            for section_schedule in schedules:
+                if self.check_for_conflicts(section_schedule, schedule):
+                    continue
+                
+                schedule[var] = [section_schedule, section_code]
+                result = self.backtracking_search(schedule)
+                
+                if result is not None:
+                    return result
+                
+                del schedule[var]
+        
+        return None
+    
+    def select_unassigned_variable(self, schedule):
+        """
+        Select most constrained unassigned variable
+        """
+        unassigned = [var for var in self.variables if var not in schedule]
+        return min(unassigned, key=lambda var: len(self.domains[var]))
+    
+    def solve(self):
+        """
+        Solve the constraint satisfaction problem
+        """
+        self.final_schedule = self.backtracking_search()
+        return self.final_schedule
+
+
+data = pd.read_json("course_data.json")
+variables = []
+domains = {}
+for course, course_data in data.items():
+    variables.append(course)
+    # Initialize the domain for the course
+    if course not in domains:
+        domains[course] = {}
+    # Process each section
+    for section in course_data['current_sections']:
+        schedule = section['schedule']
+        section_number = section['section_number']
+        schedules = schedule.split(",")
+        schedules = (schedule for schedule in schedules if schedule[0] not in str(range(0, 10)))
+        if section_number not in domains[course]:
+            domains[course][section_number] = []
+        domains[course][section_number].extend(schedules)
+
+time_constraints = (dt.strptime("10:00am", "%I:%M%p").time(), dt.strptime("5:00pm", "%I:%M%p").time())
+csp = CSP(variables, domains, time_constaints=time_constraints)
+solution = csp.solve()
+print(solution)
