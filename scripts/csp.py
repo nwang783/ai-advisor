@@ -257,38 +257,35 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
     # Return formatted output
     return format_output(combined_data), combined_data
 
+import re
+from datetime import datetime as dt
+import pandas as pd
+
 class CSP:
-    def __init__(self, variables, domains, time_constaints=None):
+    def __init__(self, variables, domains, time_constraints=None):
+        """
+        Initialize CSP with lab section processing
+        """
         self.variables = variables
         self.domains = domains
         self.final_schedule = {}
-        self.time_contraints = time_constaints
-        self.add_classes_with_labs()
-
-    def parse_schedule(self, schedule_string):
-        if isinstance(schedule_string, list):
-            schedule_string = schedule_string[0]
-        """
-        Robust schedule parsing with multiple parsing strategies
+        self.time_constraints = time_constraints
         
-        Learning Breakdown:
-        1. Uses regular expressions for flexible parsing
-        2. Handles multiple schedule formats
-        3. Provides detailed error information
+        # Process and separate lab sections
+        self.add_classes_with_labs()
+        
+    def parse_schedule(self, schedule_string):
         """
-        # Regular expression to parse various schedule formats
-        # Breaks down the parsing into logical components
+        Parse a schedule string into a structured format
+        
+        Robust parsing handles various schedule formats
+        """
+        # Flexible regex to handle different schedule formats
         schedule_pattern = r'^(\w+)\s+(\d{1,2}:\d{2}(?:am|pm))\s*-\s*(\d{1,2}:\d{2}(?:am|pm))$'
         
         try:
-            # Attempt to match the schedule using regex
+            # Attempt to match the schedule
             match = re.match(schedule_pattern, schedule_string)
-            
-            if not match:
-                # Attempt more flexible parsing for complex schedules
-                # Like those with multiple day abbreviations (MoWeFr)
-                more_flexible_pattern = r'^(\w+)\s+(\d{1,2}:\d{2}\s*(?:am|pm))\s*-\s*(\d{1,2}:\d{2}\s*(?:am|pm))$'
-                match = re.match(more_flexible_pattern, schedule_string)
             
             if not match:
                 raise ValueError(f"Cannot parse schedule format: {schedule_string}")
@@ -301,22 +298,17 @@ class CSP:
             return {
                 'days': days,
                 'start_time': start_time,
-                'end_time': end_time,
-                'date': None  # Default for standard schedules
+                'end_time': end_time
             }
         
         except Exception as e:
-            # Comprehensive error handling
             raise ValueError(f"Detailed parsing error for '{schedule_string}': {str(e)}")
     
     def format_time(self, time_string):
         """
-        Intelligent time parsing with multiple strategies
+        Convert time string to datetime time object
         
-        Teaching Points:
-        - Removes whitespace
-        - Handles variations in time input
-        - Provides clear error messages
+        Handles multiple time input formats
         """
         # Remove any whitespace
         time_string = time_string.replace(' ', '')
@@ -330,127 +322,258 @@ class CSP:
                 # Try without colon
                 return dt.strptime(time_string, "%I%M%p").time()
             except ValueError:
-                # Comprehensive error reporting
                 raise ValueError(f"Cannot parse time: {time_string}")
     
     def has_time_conflict(self, schedule1, schedule2):
         """
-        Advanced conflict detection
-        - Checks for day overlap
-        - Handles both recurring and dated sessions
-        """
-        # If both have dates, check if they're the same
-        if schedule1.get('date') and schedule2.get('date'):
-            if schedule1['date'] != schedule2['date']:
-                return False
+        Detect time conflicts between two class schedules
         
+        Checks for:
+        - Day overlap
+        - Time overlap
+        """
         # Check day overlap
         shared_days = set(schedule1['days']) & set(schedule2['days'])
         
         if shared_days:
             # Check time overlap
             return not (schedule1['end_time'] <= schedule2['start_time'] or 
-                        schedule2['end_time'] <= schedule1['start_time']) 
+                        schedule2['end_time'] <= schedule1['start_time'])
         
-        return False
-    
-    def check_for_conflicts(self, new_class, current_schedule):
-        """
-        Check if new class conflicts with existing schedule
-        """
-        # If the new class has multiple schedules, check all combinations
-        if isinstance(new_class, list):
-            return any(
-                self.check_for_conflicts(section, current_schedule) 
-                for section in new_class
-            )
-        
-        parsed_new_class = self.parse_schedule(new_class)
-        
-        for assigned_class in current_schedule.values():
-            parsed_assigned = self.parse_schedule(assigned_class)
-            if self.has_time_conflict(parsed_new_class, parsed_assigned):
-                return True
-            elif self.time_contraints:
-                if parsed_new_class['start_time'] <= self.time_contraints[0] or parsed_new_class['end_time'] >= self.time_contraints[1]:
-                    return True
         return False
     
     def add_classes_with_labs(self):
         """
-        Add lab sections as separate variables in the domains dictionary.
-        Remove corresponding lab sections from their original courses.
+        Process and separate lab sections from lecture sections
+        
+        Goals:
+        - Identify lab sections
+        - Create separate domain entries for labs
+        - Modify variables list to include lab courses
         """
-        domains = self.domains.copy()  # Copy the domains to avoid modifying the original
-        for course, sections in list(domains.items()):  # Iterate over a copy of the dictionary
-            lab_sections = {}  # Dictionary to hold lab sections
-            lecture_sections = {}  # Dictionary to hold lecture sections
+        # Create a copy of domains to avoid modifying during iteration
+        original_domains = self.domains.copy()
+        
+        for course, sections in original_domains.items():
+            lab_sections = {}  # To hold lab sections
+            lecture_sections = {}  # To hold lecture sections
 
             # Separate lecture and lab sections
-            for section, schedule in sections.items():
-                if section.startswith("1"):  # Assume lab sections start with "1"
-                    lab_sections[section] = schedule
+            for section, section_data in sections.items():
+                # Assume lab sections start with "1"
+                if str(section).startswith("1"):
+                    lab_sections[section] = section_data
                 else:
-                    lecture_sections[section] = schedule
+                    lecture_sections[section] = section_data
 
-            # Update the course with only lecture sections
+            # Update the main domains
             self.domains[course] = lecture_sections
 
-            # Add a new entry for lab sections if they exist
+            # Add lab sections as a new course if labs exist
             if lab_sections:
                 lab_course_key = f"{course}_lab"
-                self.variables.append(lab_course_key)
+                
+                # Add lab course to variables
+                if lab_course_key not in self.variables:
+                    self.variables.append(lab_course_key)
+                
+                # Add lab sections to domains
                 self.domains[lab_course_key] = lab_sections
-
-    def backtracking_search(self, schedule=None):
+    
+    def check_for_conflicts(self, new_class, current_schedule):
         """
-        Backtracking search with support for complex domains
+        Check if a new class conflicts with existing schedule
+        
+        Handles different possible schedule structures
         """
-
+        # If new class doesn't have a schedule, skip
+        if 'schedule' not in new_class or not new_class['schedule']:
+            return False
+        
+        # Parse the new class schedule
+        parsed_new_class = self.parse_schedule(new_class['schedule'][0])
+        
+        # Check against existing schedule
+        for course, assigned_class in current_schedule.items():
+            # Iterate through sections in the assigned course
+            for section, section_data in assigned_class.items():
+                # Check if section has a schedule
+                if 'schedule' not in section_data or not section_data['schedule']:
+                    continue
+                
+                # Parse the assigned class schedule
+                parsed_assigned = self.parse_schedule(section_data['schedule'][0])
+                
+                # Check for time conflict
+                if self.has_time_conflict(parsed_new_class, parsed_assigned):
+                    return True
+        
+        # Check against time constraints if specified
+        if self.time_constraints:
+            parsed_start = parsed_new_class['start_time']
+            parsed_end = parsed_new_class['end_time']
+            
+            if (parsed_start < self.time_constraints[0] or 
+                parsed_end > self.time_constraints[1]):
+                return True
+        
+        return False
+    
+    def backtracking_search(self, schedule=None, optimize_ratings=False):
+        """
+        Advanced backtracking search with optional rating optimization
+        
+        Key Optimization Strategy:
+        1. If optimize_ratings is True, prioritize sections with higher ratings
+        2. Maintain all existing constraint satisfaction rules
+        3. Provide a flexible approach to schedule generation
+        
+        Args:
+        - schedule: Current partial schedule
+        - optimize_ratings: Flag to enable rating-based section selection
+        
+        Returns:
+        - Optimized schedule or None if no valid schedule found
+        """
         if schedule is None:
             schedule = {}
         
+        # Check if all variables are assigned
         if len(schedule) == len(self.variables):
             return schedule
         
+        # Select an unassigned variable (course)
         var = self.select_unassigned_variable(schedule)
         
-        for section_code, section_schedules in self.domains[var].items():
-            # Handle single or multiple schedules for a section
-            schedules = section_schedules if isinstance(section_schedules, list) else [section_schedules]
+        # If optimizing ratings, sort sections by rating in descending order
+        sections = self.domains[var].items()
+        if optimize_ratings:
+            # Filter out sections without ratings, then sort
+            rated_sections = [
+                (section_code, section_data) 
+                for section_code, section_data in sections 
+                if section_data.get('rating') is not None
+            ]
             
-            for section_schedule in schedules:
-                if self.check_for_conflicts(section_schedule, schedule):
-                    continue
-                
-                schedule[var] = [section_schedule, section_code]
-                result = self.backtracking_search(schedule)
-                
-                if result is not None:
-                    return result
-                
-                del schedule[var]
+            # Sort by rating in descending order, fallback to original order
+            sections = sorted(
+                rated_sections, 
+                key=lambda x: x[1].get('rating', 0), 
+                reverse=True
+            )
+            
+            # Add unrated sections at the end
+            unrated_sections = [
+                (section_code, section_data) 
+                for section_code, section_data in self.domains[var].items() 
+                if section_data.get('rating') is None
+            ]
+            sections.extend(unrated_sections)
+        
+        # Try each section of the course
+        for section_code, section_data in sections:
+            # Skip if no schedule or section already in schedule
+            if 'schedule' not in section_data or not section_data['schedule']:
+                continue
+            
+            # Check for conflicts
+            if self.check_for_conflicts(section_data, schedule):
+                continue
+            
+            # Create a copy of the current schedule to avoid modifying the original
+            new_schedule = schedule.copy()
+            
+            # Assign the section
+            new_schedule[var] = {section_code: section_data}
+            
+            # Recursive search
+            result = self.backtracking_search(new_schedule, optimize_ratings)
+            
+            if result is not None:
+                return result
         
         return None
     
     def select_unassigned_variable(self, schedule):
         """
-        Select most constrained unassigned variable
+        Select the most constrained unassigned variable
+        
+        Prioritizes courses with fewer possible sections
         """
         unassigned = [var for var in self.variables if var not in schedule]
         return min(unassigned, key=lambda var: len(self.domains[var]))
     
-    def solve(self):
+    def solve(self, optimize_ratings=False):
         """
         Solve the constraint satisfaction problem
+        
+        Adds optional rating optimization to the search process
+        
+        Args:
+        - optimize_ratings: Flag to enable rating-based section selection
+        
+        Returns:
+        - Optimized final schedule
         """
-        self.final_schedule = self.backtracking_search()
+        self.final_schedule = self.backtracking_search(optimize_ratings=optimize_ratings)
         return self.final_schedule
 
+def find_stats_for_section(instructor, course_data):
+    """
+    Find the rating for a given instructor in the course data
+    """
+    for course, course_info in course_data.items():
+        for instructor_name, info in course_info.get('course_ratings', []).items():
+            if instructor_name == instructor:
+                info = [info['rating'], info['difficulty'], info['gpa']]
+                for i, entry in enumerate(info):
+                    if entry == "N/A":
+                        info[i] = None
+                    else:
+                        info[i] = round(float(entry), 2)
+                return info 
+                
+    return None  # Default stats if not founds
+
+def calculate_solution_stats(solution):
+    """
+    Calculate the average rating, difficulty, and GPA for the solution
+    """
+    num_ratings = 0
+    total_rating = 0
+    num_difficulties = 0
+    total_difficulty = 0
+    num_gpas = 0
+    total_gpa = 0
+    
+    for course, sections in solution.items():
+        for section, section_data in sections.items():
+            # Check if 'rating' exists and is not None
+            if section_data.get('rating') is not None:
+                num_ratings += 1
+                total_rating += section_data['rating']
+            
+            # Check if 'difficulty' exists and is not None
+            if section_data.get('difficulty') is not None:
+                num_difficulties += 1
+                total_difficulty += section_data['difficulty']
+            
+            # Check if 'gpa' exists and is not None
+            if section_data.get('gpa') is not None:
+                num_gpas += 1
+                total_gpa += section_data['gpa']
+    
+    # Handle cases where there are no ratings, difficulties, or GPAs to avoid ZeroDivisionError
+    return {
+        'average_rating': round(total_rating / num_ratings, 2) if num_ratings > 0 else 0,
+        'average_difficulty': round(total_difficulty / num_difficulties, 2) if num_difficulties > 0 else 0,
+        'average_gpa': round(total_gpa / num_gpas, 2) if num_gpas > 0 else 0
+    }
 
 data = pd.read_json("course_data.json")
 variables = []
 domains = {}
+
 for course, course_data in data.items():
     variables.append(course)
     # Initialize the domain for the course
@@ -460,13 +583,37 @@ for course, course_data in data.items():
     for section in course_data['current_sections']:
         schedule = section['schedule']
         section_number = section['section_number']
+        # Split the schedule and filter invalid entries
         schedules = schedule.split(",")
-        schedules = (schedule for schedule in schedules if schedule[0] not in str(range(0, 10)))
+        schedules = [s.strip() for s in schedules if not s[0].isdigit()]
         if section_number not in domains[course]:
-            domains[course][section_number] = []
-        domains[course][section_number].extend(schedules)
+            domains[course][section_number] = {}  # Ensure it's a dict, not a list
+        # Add schedule and rating
+        domains[course][section_number]["schedule"] = schedules
+        instructor = section['instructor']
+        section_info = find_stats_for_section(instructor, data)
+        if section_info:
+            domains[course][section_number]["rating"] = section_info[0]
+            domains[course][section_number]["difficulty"] = section_info[1]
+            domains[course][section_number]["gpa"] = section_info[2]
 
-time_constraints = (dt.strptime("10:00am", "%I:%M%p").time(), dt.strptime("5:00pm", "%I:%M%p").time())
-csp = CSP(variables, domains, time_constaints=time_constraints)
+# Time constraints (optional)
+time_constraints = (
+    dt.strptime("8:00am", "%I:%M%p").time(), 
+    dt.strptime("6:00pm", "%I:%M%p").time()
+)
+
+# Create the CSP instance
+csp = CSP(variables, domains, time_constraints)
+
+# Solve and get the schedule
 solution = csp.solve()
 print(solution)
+stats = calculate_solution_stats(solution)
+print(f"No optimization stats: {stats}")
+
+# Optimize for ratings
+optimized_solution = csp.solve(optimize_ratings=True)
+print(optimized_solution)
+optimized_stats = calculate_solution_stats(optimized_solution)
+print(f"Optimized stats: {optimized_stats}")
