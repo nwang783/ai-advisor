@@ -570,7 +570,12 @@ def calculate_solution_stats(solution):
         'average_gpa': round(total_gpa / num_gpas, 2) if num_gpas > 0 else 0
     }
 
-data = pd.read_json("course_data.json")
+data = {}
+input_classes = ['CS 2120', 'CS 2100']
+for course in input_classes:
+    mnemonic, number = course.split()
+    _, data[course] = get_comprehensive_course_info(mnemonic, number)
+
 variables = []
 domains = {}
 
@@ -596,6 +601,11 @@ for course, course_data in data.items():
             domains[course][section_number]["rating"] = section_info[0]
             domains[course][section_number]["difficulty"] = section_info[1]
             domains[course][section_number]["gpa"] = section_info[2]
+            domains[course][section_number]["instructor"] = instructor
+            domains[course][section_number]["location"] = section['location']
+
+print(f'Variables: {variables}')
+print(f'Domains: {domains}')
 
 # Time constraints (optional)
 time_constraints = (
@@ -610,10 +620,10 @@ csp = CSP(variables, domains, time_constraints)
 solution = csp.solve()
 print(solution)
 stats = calculate_solution_stats(solution)
-print(f"No optimization stats: {stats}")
+print(f"\nNo optimization stats: {stats}")
 
 # Optimize for ratings
 optimized_solution = csp.solve(optimize_ratings=True)
-print(optimized_solution)
+print(f"\n\n{optimized_solution}")
 optimized_stats = calculate_solution_stats(optimized_solution)
-print(f"Optimized stats: {optimized_stats}")
+print(f"\nOptimized stats: {optimized_stats}")

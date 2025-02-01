@@ -14,12 +14,76 @@ const Modal = ({ isOpen, onClose, children }) => {
 };
 
 const Calendar = ({ scheduleData }) => {
-  const [selectedClass, setSelectedClass] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);  
+  const [formattedData, setFormattedData] = useState(null);
 
-  const normalizeScheduleData = (data) => {
-    console.log(JSON.stringify(data));
-    return data;
-  };      
+  const formatData = (inputData) => {
+    // Initialize output structure
+    const output = {
+      class_data: {
+        day_of_the_week: {
+          Monday: {},
+          Tuesday: {},
+          Wednesday: {},
+          Thursday: {},
+          Friday: {}
+        }
+      }
+    };
+  
+    // Day mapping from schedule format to output format
+    const dayMapping = {
+      'Mo': 'Monday',
+      'Tu': 'Tuesday',
+      'We': 'Wednesday',
+      'Th': 'Thursday',
+      'Fr': 'Friday'
+    };
+  
+    // Process each course
+    for (const [courseName, sections] of Object.entries(inputData)) {
+      for (const [sectionId, sectionData] of Object.entries(sections)) {
+        // Get the schedule string (assuming first schedule in array)
+        const scheduleStr = sectionData.schedule[0];
+        
+        // Extract days and time
+        const [daysStr, timeStr] = scheduleStr.split(' ');
+        const time = timeStr.trim();
+        
+        // Split days into individual day codes (Mo, Tu, etc.)
+        const dayCodes = daysStr.match(/(Mo|Tu|We|Th|Fr)/g) || [];
+  
+        // Create course info object
+        const courseInfo = {
+          prof: sectionData.instructor || null,
+          time: time,
+          location: sectionData.location || null,
+          rating: sectionData.rating || null,
+          avg_gpa: sectionData.gpa || null,
+          difficulty: sectionData.difficulty || null
+        };
+  
+        // Add course to each day it occurs
+        dayCodes.forEach(dayCode => {
+          const fullDayName = dayMapping[dayCode];
+          if (fullDayName) {
+            output.class_data.day_of_the_week[fullDayName][courseName] = courseInfo;
+          }
+        });
+      }
+    }
+
+    console.log(output);
+    return output;
+  };
+
+  // Move data formatting to useEffect to avoid unnecessary recalculations
+  React.useEffect(() => {
+    if (scheduleData) {
+      const normalized = formatData(scheduleData);
+      setFormattedData(normalized);
+    }
+  }, [scheduleData]);
 
   const generatePastelColor = (seed) => {
     const hash = seed.split('').reduce((acc, char) => char.charCodeAt(0) + acc, 0);
@@ -35,12 +99,11 @@ const Calendar = ({ scheduleData }) => {
   });
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-  const normalizedData = normalizeScheduleData(scheduleData);
 
   const getClassForTimeSlot = (time, day) => {
-    if (!normalizedData?.class_data?.day_of_the_week[day]) return null;
+    if (!formattedData?.class_data?.day_of_the_week[day]) return null;
 
-    const dayClasses = normalizedData.class_data.day_of_the_week[day];
+    const dayClasses = formattedData.class_data.day_of_the_week[day];
 
     return Object.entries(dayClasses).find(([_, details]) => {
       if (!details.time) return false;
@@ -62,6 +125,8 @@ const Calendar = ({ scheduleData }) => {
       return normalizedClassHour === normalizedTimeHour;
     });
   };
+
+  if (!formattedData) return <div>Loading...</div>;
 
   return (
     <div className="schedule-container">
@@ -100,7 +165,7 @@ const Calendar = ({ scheduleData }) => {
                     <div className="class-name truncate">{className}</div>
                     <div className="class-time text-xs">{details.time}</div>
                     <div className="class-time text-xs">{details.prof}</div>
-                    <div className="class-time text-xs">Rating: ({details.rating ? details.rating : "N/A"})</div>
+                    <div className="class-time text-xs">Rating: ({details.rating ?? "N/A"})</div>
                   </div>
                 </div>
               );
@@ -120,37 +185,38 @@ const Calendar = ({ scheduleData }) => {
               </div>
               <div className="info-group">
                 <h3>Location</h3>
-                <p>{selectedClass.details.location}</p>
+                <p>{selectedClass.details.location ?? 'N/A'}</p>
               </div>
               {selectedClass.details.prof && (
                 <div className="info-group">
                   <h3>Instructor</h3>
                   <p>
                     {selectedClass.details.prof}
-                    {selectedClass.details.rating && (selectedClass.details.rating ? ` (Rating: ${selectedClass.details.rating})` : ' (Rating: N/A)')}
+                    <span>{selectedClass.details.rating ? ` (Rating: ${selectedClass.details.rating})` : ' (Rating: N/A)'}</span>
                   </p>
                 </div>
               )}
-              {selectedClass.details.average_gpa && (
-              <div className="info-group">
-                <h3>Average GPA</h3>
-                <p>{selectedClass.details.average_gpa}</p>
-              </div>
+              {selectedClass.details.avg_gpa && (
+                <div className="info-group">
+                  <h3>Average GPA</h3>
+                  <p>{selectedClass.details.avg_gpa}</p>
+                </div>
               )}
               {selectedClass.details.difficulty && (
-              <div className="info-group">
-                <h3>Difficulty</h3>
-                <p>{selectedClass.details.difficulty}</p>
-              </div>
+                <div className="info-group">
+                  <h3>Difficulty</h3>
+                  <p>{selectedClass.details.difficulty}</p>
+                </div>
               )}
-              <div className='info-group'>
+              <div className="info-group">
                 <h3>Learn More</h3>
                 <a
                   href={`https://thecourseforum.com/course/${selectedClass.className.split(' ')[0]}/${selectedClass.className.split(' ')[1]}`}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700"
                 >
-                  {`https://thecourseforum.com/course/${selectedClass.className.split(' ')[0]}/${selectedClass.className.split(' ')[1]}`}
+                  View on CourseForum
                 </a>
               </div>
             </div>

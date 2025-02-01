@@ -1,21 +1,273 @@
 from firebase_functions import https_fn
 from firebase_admin import initialize_app
-from firebase_functions.params import StringParam
 import json
-from openai import OpenAI
-import time
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlencode
-from typing import Dict, Union, List, Optional
+from typing import Dict, Optional
 from datetime import datetime as dt
+import re
+import pandas as pd
 
 # Initialize Firebase Admin
 initialize_app()
 
-# Define configuration parameters
-OPENAI_API_KEY = StringParam("OPENAI_API_KEY")
-ASSISTANT_ID = StringParam("ASSISTANT_ID", default="asst_n4Wj8E7uUACcKvKX4uPGkhgZ")
+class CSP:
+    def __init__(self, variables, domains, time_constraints=None):
+        """
+        Initialize CSP with lab section processing
+        """
+        self.variables = variables
+        self.domains = domains
+        self.final_schedule = {}
+        self.time_constraints = time_constraints
+        
+        # Process and separate lab sections
+        self.add_classes_with_labs()
+        
+    def parse_schedule(self, schedule_string):
+        """
+        Parse a schedule string into a structured format
+        
+        Robust parsing handles various schedule formats
+        """
+        # Flexible regex to handle different schedule formats
+        schedule_pattern = r'^(\w+)\s+(\d{1,2}:\d{2}(?:am|pm))\s*-\s*(\d{1,2}:\d{2}(?:am|pm))$'
+        
+        try:
+            # Attempt to match the schedule
+            match = re.match(schedule_pattern, schedule_string)
+            
+            if not match:
+                raise ValueError(f"Cannot parse schedule format: {schedule_string}")
+            
+            # Extract components
+            days = [match.group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
+            start_time = self.format_time(match.group(2).strip())
+            end_time = self.format_time(match.group(3).strip())
+            
+            return {
+                'days': days,
+                'start_time': start_time,
+                'end_time': end_time
+            }
+        
+        except Exception as e:
+            raise ValueError(f"Detailed parsing error for '{schedule_string}': {str(e)}")
+    
+    def format_time(self, time_string):
+        """
+        Convert time string to datetime time object
+        
+        Handles multiple time input formats
+        """
+        # Remove any whitespace
+        time_string = time_string.replace(' ', '')
+        
+        try:
+            # Primary parsing strategy
+            return dt.strptime(time_string, "%I:%M%p").time()
+        except ValueError:
+            # Fallback parsing strategies
+            try:
+                # Try without colon
+                return dt.strptime(time_string, "%I%M%p").time()
+            except ValueError:
+                raise ValueError(f"Cannot parse time: {time_string}")
+    
+    def has_time_conflict(self, schedule1, schedule2):
+        """
+        Detect time conflicts between two class schedules
+        
+        Checks for:
+        - Day overlap
+        - Time overlap
+        """
+        # Check day overlap
+        shared_days = set(schedule1['days']) & set(schedule2['days'])
+        
+        if shared_days:
+            # Check time overlap
+            return not (schedule1['end_time'] <= schedule2['start_time'] or 
+                        schedule2['end_time'] <= schedule1['start_time'])
+        
+        return False
+    
+    def add_classes_with_labs(self):
+        """
+        Process and separate lab sections from lecture sections
+        
+        Goals:
+        - Identify lab sections
+        - Create separate domain entries for labs
+        - Modify variables list to include lab courses
+        """
+        # Create a copy of domains to avoid modifying during iteration
+        original_domains = self.domains.copy()
+        
+        for course, sections in original_domains.items():
+            lab_sections = {}  # To hold lab sections
+            lecture_sections = {}  # To hold lecture sections
+
+            # Separate lecture and lab sections
+            for section, section_data in sections.items():
+                # Assume lab sections start with "1"
+                if str(section).startswith("1"):
+                    lab_sections[section] = section_data
+                else:
+                    lecture_sections[section] = section_data
+
+            # Update the main domains
+            self.domains[course] = lecture_sections
+
+            # Add lab sections as a new course if labs exist
+            if lab_sections:
+                lab_course_key = f"{course}_lab"
+                
+                # Add lab course to variables
+                if lab_course_key not in self.variables:
+                    self.variables.append(lab_course_key)
+                
+                # Add lab sections to domains
+                self.domains[lab_course_key] = lab_sections
+    
+    def check_for_conflicts(self, new_class, current_schedule):
+        """
+        Check if a new class conflicts with existing schedule
+        
+        Handles different possible schedule structures
+        """
+        # If new class doesn't have a schedule, skip
+        if 'schedule' not in new_class or not new_class['schedule']:
+            return False
+        
+        # Parse the new class schedule
+        parsed_new_class = self.parse_schedule(new_class['schedule'][0])
+        
+        # Check against existing schedule
+        for course, assigned_class in current_schedule.items():
+            # Iterate through sections in the assigned course
+            for section, section_data in assigned_class.items():
+                # Check if section has a schedule
+                if 'schedule' not in section_data or not section_data['schedule']:
+                    continue
+                
+                # Parse the assigned class schedule
+                parsed_assigned = self.parse_schedule(section_data['schedule'][0])
+                
+                # Check for time conflict
+                if self.has_time_conflict(parsed_new_class, parsed_assigned):
+                    return True
+        
+        # Check against time constraints if specified
+        if self.time_constraints:
+            parsed_start = parsed_new_class['start_time']
+            parsed_end = parsed_new_class['end_time']
+            
+            if (parsed_start < self.time_constraints[0] or 
+                parsed_end > self.time_constraints[1]):
+                return True
+        
+        return False
+    
+    def backtracking_search(self, schedule=None, optimize_ratings=False):
+        """
+        Advanced backtracking search with optional rating optimization
+        
+        Key Optimization Strategy:
+        1. If optimize_ratings is True, prioritize sections with higher ratings
+        2. Maintain all existing constraint satisfaction rules
+        3. Provide a flexible approach to schedule generation
+        
+        Args:
+        - schedule: Current partial schedule
+        - optimize_ratings: Flag to enable rating-based section selection
+        
+        Returns:
+        - Optimized schedule or None if no valid schedule found
+        """
+        if schedule is None:
+            schedule = {}
+        
+        # Check if all variables are assigned
+        if len(schedule) == len(self.variables):
+            return schedule
+        
+        # Select an unassigned variable (course)
+        var = self.select_unassigned_variable(schedule)
+        
+        # If optimizing ratings, sort sections by rating in descending order
+        sections = self.domains[var].items()
+        if optimize_ratings:
+            # Filter out sections without ratings, then sort
+            rated_sections = [
+                (section_code, section_data) 
+                for section_code, section_data in sections 
+                if section_data.get('rating') is not None
+            ]
+            
+            # Sort by rating in descending order, fallback to original order
+            sections = sorted(
+                rated_sections, 
+                key=lambda x: x[1].get('rating', 0), 
+                reverse=True
+            )
+            
+            # Add unrated sections at the end
+            unrated_sections = [
+                (section_code, section_data) 
+                for section_code, section_data in self.domains[var].items() 
+                if section_data.get('rating') is None
+            ]
+            sections.extend(unrated_sections)
+        
+        # Try each section of the course
+        for section_code, section_data in sections:
+            # Skip if no schedule or section already in schedule
+            if 'schedule' not in section_data or not section_data['schedule']:
+                continue
+            
+            # Check for conflicts
+            if self.check_for_conflicts(section_data, schedule):
+                continue
+            
+            # Create a copy of the current schedule to avoid modifying the original
+            new_schedule = schedule.copy()
+            
+            # Assign the section
+            new_schedule[var] = {section_code: section_data}
+            
+            # Recursive search
+            result = self.backtracking_search(new_schedule, optimize_ratings)
+            
+            if result is not None:
+                return result
+        
+        return None
+    
+    def select_unassigned_variable(self, schedule):
+        """
+        Select the most constrained unassigned variable
+        
+        Prioritizes courses with fewer possible sections
+        """
+        unassigned = [var for var in self.variables if var not in schedule]
+        return min(unassigned, key=lambda var: len(self.domains[var]))
+    
+    def solve(self, optimize_ratings=False):
+        """
+        Solve the constraint satisfaction problem
+        
+        Adds optional rating optimization to the search process
+        
+        Args:
+        - optimize_ratings: Flag to enable rating-based section selection
+        
+        Returns:
+        - Optimized final schedule
+        """
+        self.final_schedule = self.backtracking_search(optimize_ratings=optimize_ratings)
+        return self.final_schedule
 
 def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = "", topic: str = None) -> Dict:
     """
@@ -266,325 +518,34 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
         return "\n".join(output)
 
     # Return formatted output
-    return format_output(combined_data)
+    return format_output(combined_data), combined_data
 
-class ScheduleValidator:
-    def __init__(self):
-        self.day_mapping = {
-            "mo": "Monday",
-            "tu": "Tuesday",
-            "we": "Wednesday",
-            "th": "Thursday",
-            "fr": "Friday"
-        }
-
-    def validate_schedule(self, ai_response):
-        try:
-            # Handle both string and dict inputs
-            if isinstance(ai_response, str):
-                response = json.loads(ai_response)
-            else:
-                response = ai_response
-
-            if not response.get("class_data"):
-                return False, ["No class data found in response"]
-            
-            # If day_of_the_week exists, use it, otherwise use class_data directly
-            class_data = (response["class_data"].get("day_of_the_week") or 
-                         response["class_data"])
-            
-            if not class_data:
-                return False, ["No schedule data found in response"]
-
-            # Store the class data in the format we need
-            response["class_data"] = {"day_of_the_week": class_data}
-
-            validation_messages = []
-            schedule_valid = True
-
-            # Check for conflicts
-            conflicts = self._check_for_conflicts(response)
-            if conflicts:  # If we have any conflicts
-                schedule_valid = False
-                validation_messages.extend(conflicts)
-            else:
-                validation_messages.append("No time conflicts detected")
-
-            return schedule_valid, validation_messages
-
-        except json.JSONDecodeError:
-            return False, ["Invalid JSON format in response"]
-        except Exception as e:
-            return False, [f"Error validating schedule: {str(e)}"]
-
-    def _check_for_conflicts(self, response):
-        """Check for time conflicts between courses."""
-        conflicts = []
-        class_data = response["class_data"]["day_of_the_week"]
-
-        for day, courses in class_data.items():
-            # Create list of course times for this day
-            day_schedule = []
-            for course_name, details in courses.items():
-                if isinstance(details, dict) and "time" in details:
-                    day_schedule.append({
-                        "name": course_name,
-                        "time": details["time"]
-                    })
-
-            # Check each course against every other course for that day
-            for i, course1 in enumerate(day_schedule):
-                for j, course2 in enumerate(day_schedule[i + 1:], i + 1):
-                    if self._has_time_overlap(course1["time"], course2["time"]):
-                        conflict_msg = (
-                            f"Conflict detected between {course1['name']} and "
-                            f"{course2['name']} on {day} at times "
-                            f"{course1['time']} and {course2['time']}"
-                        )
-                        conflicts.append(conflict_msg)
-
-        return conflicts
-
-    def _has_time_overlap(self, time_a, time_b):
-        """Check if two time ranges overlap"""
-        def parse_time(time_str):
-            return dt.strptime(time_str, "%I:%M%p")
-
-        try:
-            start_a, end_a = map(
-                parse_time,
-                time_a.lower().replace(" ", "").split("-")
-            )
-            start_b, end_b = map(
-                parse_time,
-                time_b.lower().replace(" ", "").split("-")
-            )
-            return (start_a < end_b) and (start_b < end_a)
-        except ValueError:
-            return False
-
-def wait_for_run_completion(thread_id, run_id, client):
-    """Wait for assistant run to complete"""
-    logs = []
-    while True:
-        try:
-            run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-            
-            if run.status == "requires_action":
-                tool_outputs = []
-                for tool_call in run.required_action.submit_tool_outputs.tool_calls:
-                    logs.append(f"Tool call arguments: {tool_call.function.arguments}")
-                    try:
-                        args = json.loads(tool_call.function.arguments)
-                        if tool_call.function.name == "get_comprehensive_course_info":
-                            result = get_comprehensive_course_info(
-                                instructor=args.get("instructor", ""),
-                                mnemonic=args.get("mnemonic", ""),
-                                number=args.get("number", "")
-                            )
-                            tool_outputs.append({
-                                "tool_call_id": tool_call.id,
-                                "output": result
-                            })
-                    except json.JSONDecodeError:
-                        print(f"Invalid JSON in tool call arguments: {tool_call.function.arguments}")
-                        continue
+def find_stats_for_section(instructor, course_data):
+    """
+    Find the rating for a given instructor in the course data
+    """
+    for course, course_info in course_data.items():
+        for instructor_name, info in course_info.get('course_ratings', []).items():
+            if instructor_name == instructor:
+                info = [info['rating'], info['difficulty'], info['gpa']]
+                for i, entry in enumerate(info):
+                    if entry == "N/A":
+                        info[i] = None
+                    else:
+                        info[i] = round(float(entry), 2)
+                return info 
                 
-                if tool_outputs:
-                    run = client.beta.threads.runs.submit_tool_outputs(
-                        thread_id=thread_id,
-                        run_id=run.id,
-                        tool_outputs=tool_outputs
-                    )
-                    continue
+    return None  # Default stats if not founds
 
-            if run.status == "completed":
-                messages = client.beta.threads.messages.list(thread_id=thread_id)
-                if not messages.data:
-                    return "No response received"
-                return messages.data[0].content[0].text.value, logs
-                
-            if run.status == "failed":
-                return "Assistant run failed", logs
-                
-            # Add timeout logic
-            time.sleep(1)  # Prevent tight polling loop
-            
-        except Exception as e:
-            return f"Error in wait_for_run_completion: {str(e)}", logs
-
-@https_fn.on_request(timeout_sec=240)
-def schedule_builder(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function that integrates OpenAI assistant with professor ratings."""
-
-    # Handle preflight (OPTIONS) requests
-    if req.method == "OPTIONS":
-        print("Handling preflight request")
-        return https_fn.Response(
-            status=204,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Max-Age": "3600"
-            }
-        )
-    
-    thread_id = None
-
-    try:
-        # Validate required environment variables
-        api_key = OPENAI_API_KEY.value
-        assistant_id = ASSISTANT_ID.value
-
-        print(f"Assistant ID: {assistant_id}")
-
-        if not api_key or not assistant_id:
-            raise ValueError("Missing required environment variables")
-
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-        if client:
-            print("OpenAI client initialized successfully")
-
-        # Validate request
-        if not req.get_json():
-            raise ValueError("Request body is required")
-            
-        request_json = req.get_json()
-        if 'message' not in request_json:
-            raise ValueError("Message is required")
-
-        user_message = request_json['message']
-        thread_id = request_json.get('threadId')
-
-        # Create or retrieve thread
-        if not thread_id:
-            thread = client.beta.threads.create()
-            thread_id = thread.id
-        
-        print(f"Thread ID: {thread_id}")
-        
-        # Add message and create run
-        client.beta.threads.messages.create(
-            thread_id=thread_id,
-            role="user",
-            content=user_message
-        )
-
-        try:
-            run = client.beta.threads.runs.create(
-                thread_id=thread_id,
-                assistant_id=assistant_id
-            )
-        except Exception as e:
-            print(f"Error creating assistant run: {str(e)}")
-            raise ValueError(f"Error creating assistant run: {str(e)}")
-
-        print(f"Run ID: {run.id}")
-
-        # Get assistant response and handle conflicts
-        validator = ScheduleValidator()
-
-        assistant_response, logs = wait_for_run_completion(thread_id, run.id, client)
-        print(f"Logs: {logs}")
-        print(f"Assistant response: {assistant_response}")
-        is_valid, validation_messages = validator.validate_schedule(assistant_response)
-        print("Validation Results:")
-        for msg in validation_messages:
-            print(f"- {msg}")
-
-        max_retries = 3
-        retry_count = 0
-
-        while not is_valid and retry_count < max_retries:
-            print("\nSchedule validation failed. Attempting to resolve issues.")
-            # Combine all validation messages into a clear request
-            issues_message = "\n".join(f"- {msg}" for msg in validation_messages)
-            client.beta.threads.messages.create(
-                thread_id=thread_id,
-                role="user",
-                content=f"Please resolve these issues in the schedule:\n{issues_message}"
-            )
-            
-            run = client.beta.threads.runs.create(
-                thread_id=thread_id,
-                assistant_id=assistant_id
-            )
-            
-            assistant_response, _ = wait_for_run_completion(thread_id, run.id, client)
-            print(f"Assistant response: {assistant_response}")
-            is_valid, validation_messages = validator.validate_schedule(assistant_response)
-            
-            print("\nNew Validation Results:")
-            for msg in validation_messages:
-                print(f"- {msg}")
-            
-            retry_count += 1
-
-        if not is_valid:
-            print(f"\nFailed to resolve schedule issues after {max_retries} attempts.")
-        else:
-            print("\nSchedule validation successful!")
-            
-        # Prepare response
-        try:
-            response_data = json.loads(assistant_response)
-            response_data['threadId'] = thread_id
-        except json.JSONDecodeError:
-            response_data = {
-                'message': assistant_response,
-                'threadId': thread_id,
-                'class_info': {},
-                'notes': 'Response was not in JSON format'
-            }
-        
-        return https_fn.Response(
-            json.dumps(response_data),
-             headers={
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Content-Type': 'application/json'
-            }
-        )
-
-    except Exception as e:
-        error_response = {
-            'error': str(e),
-            'message': 'An error occurred',
-            'class_info': {},
-            'notes': '',
-            'threadId': thread_id
-        }
-
-        print(f"Error: {str(e)}")
-        return https_fn.Response(    
-            json.dumps(error_response),
-            status=500,
-             headers={
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Content-Type': 'application/json'
-            }
-        )
-
-    except Exception as e:
-        return https_fn.Response(
-            json.dumps({'error': str(e)}),
-            status=500,
-             headers={
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Content-Type': 'application/json'
-            }
-        )
-    
 @https_fn.on_request()
-def get_messages_from_thread(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function to get messages from an OpenAI thread."""
+def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
+    """HTTP Cloud Function that using a csp algorithm to build a schedule.
+    
+    Args: 
+    1. input_classes (List[str]): List of classes to build a schedule for. 
+        Should be in the format of 'CS 1110', 'APMA 3080', etc. 
+    2. time_constraints (Optional[List[str]]): List of time constraints in the format of 'HH:MM AM/PM'.
+        """
     try:
         if req.method == 'OPTIONS':
             return https_fn.Response(
@@ -597,30 +558,65 @@ def get_messages_from_thread(req: https_fn.Request) -> https_fn.Response:
                 }
             )
 
-        api_key = OPENAI_API_KEY.value
-        thread_id = req.args.get('threadId')
+        if not req.get_json():
+            raise ValueError("Request body is required")
+        
+        print(f"Request JSON: {req.get_json()}")
+    
+        request_json = req.get_json()
+        if 'input_classes' not in request_json:
+            raise ValueError("Variables and domains are required")
+        
+        # Get the course info for each input class
+        data = {}
+        for course in request_json.get('input_classes'):
+            mnemonic, number = course.split()
+            _, data[course] = get_comprehensive_course_info(mnemonic, number)
+        
+        # Process the data into variables and domains
+        variables = []
+        domains = {}
 
-        if not thread_id:
-            return https_fn.Response(
-                json.dumps({'error': 'Missing threadId'}),
-                status=400,
-                headers={'Access-Control-Allow-Origin': '*'}
-            )
+        for course, course_data in data.items():
+            variables.append(course)
+            # Initialize the domain for the course
+            if course not in domains:
+                domains[course] = {}
+            # Process each section
+            for section in course_data['current_sections']:
+                schedule = section['schedule']
+                section_number = section['section_number']
+                # Split the schedule and filter invalid entries
+                schedules = schedule.split(",")
+                schedules = [s.strip() for s in schedules if not s[0].isdigit()]
+                if section_number not in domains[course]:
+                    domains[course][section_number] = {}  # Ensure it's a dict, not a list
+                # Add schedule and rating
+                domains[course][section_number]["schedule"] = schedules
+                instructor = section['instructor']
+                section_info = find_stats_for_section(instructor, data)
+                if section_info:
+                    domains[course][section_number]["rating"] = section_info[0]
+                    domains[course][section_number]["difficulty"] = section_info[1]
+                    domains[course][section_number]["gpa"] = section_info[2]
+                    domains[course][section_number]["instructor"] = instructor
+                    domains[course][section_number]["location"] = section['location']
 
-        # Initialize OpenAI client
-        client = OpenAI(api_key=api_key)
-
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-        messages = [
-            {
-                'role': message.role,
-                'content': message.content[0].text.value
-            }
-            for message in messages.data
-        ]
+        optimize_ratings = request_json.get('optimize_ratings', False)
+        time_constraints = request_json.get('time_constraints', None)
+        if time_constraints is not None:
+            time_constraints = [dt.strptime(t, "%I:%M%p").time() for t in time_constraints]
+            print(f"Time Constraints: {time_constraints}")
+            csp = CSP(variables, domains, time_constraints)
+            final_schedule = csp.solve(optimize_ratings=optimize_ratings)
+            print(f"Final Schedule: {final_schedule}")
+        else:
+            csp = CSP(variables, domains)
+            final_schedule = csp.solve(optimize_ratings=optimize_ratings)
+            print(f"Final Schedule: {final_schedule}")
 
         return https_fn.Response(
-            json.dumps({'messages': messages}),
+            json.dumps(final_schedule),
             headers={'Access-Control-Allow-Origin': '*'}
         )
 
@@ -630,27 +626,3 @@ def get_messages_from_thread(req: https_fn.Request) -> https_fn.Response:
             status=500,
             headers={'Access-Control-Allow-Origin': '*'}
         )
-
-@https_fn.on_request()
-def test_cors(req: https_fn.Request):
-    if req.method == "OPTIONS":
-        return https_fn.Response(
-            status=204,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
-                "Access-Control-Max-Age": "3600"
-            }
-        )
-    return https_fn.Response(
-        json.dumps({"message": "CORS test successful"}),
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
-            "Content-Type": "application/json"
-        }
-    )
-
-    

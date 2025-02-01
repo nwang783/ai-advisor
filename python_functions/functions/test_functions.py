@@ -1,13 +1,14 @@
 import requests
 import json
 
-def test_cs_advisor(message, thread_id=None):
-    url = "http://127.0.0.1:5001/gpt-advisor/us-central1/cs_advisor"
+def test_cs_advisor(input_classes, time_constraints, optimize_ratings=True):
+    url = "http://127.0.0.1:5001/gpt-advisor/us-central1/csp_build_schedule"
     
     # Prepare the request payload
     payload = {
-        "message": message,
-        "threadId": thread_id
+        "input_classes": input_classes,
+        "optimimze_ratings": optimize_ratings,
+        "time_constraints": time_constraints,
     }
     
     # Add debug printing
@@ -35,13 +36,6 @@ def test_cs_advisor(message, thread_id=None):
 
 if __name__ == "__main__":
     # Test different scenarios
-    # print("=== Test 1: Asking about prerequisites ===")
-    # test_cs_advisor("What are the prerequisites for CS2150?")
-    
-    print("\n=== Test 2: Asking about a professor ===")
-    test_cs_advisor("Which professor has the highest rating that teaches CS 1110?")
-    
-    # If you want to test conversation continuity, uncomment and modify these lines:
-    # thread_id = "your_thread_id_from_first_response"
-    # test_cs_advisor("What about CS3140 prerequisites?", thread_id)
+    print("=== Test 1: Asking about prerequisites ===")
+    test_cs_advisor(["CS 2120", "CS 2100"], ["9:00am", "5:00pm"])
     

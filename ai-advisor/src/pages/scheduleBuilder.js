@@ -261,26 +261,14 @@ const ScheduleBuilder = () => {
         setClassInfo(classInfo.filter((_, i) => i !== index));
     };
 
-    const createInputMessage = async () => {
-        let inputMessage = "I want to create a schedule for the following classes: ";
+    const formatInputClasses = async () => {
+        let inputClasses = [];
         classInfo.forEach((classObj) => {
-            inputMessage += `${classObj.Mnemonic} ${classObj.Number} - ${classObj.Title}, `;
+            inputClasses.push(`${classObj.Mnemonic} ${classObj.Number }`);
         });
-        inputMessage += `I want my classes to evenly be spread out across the five days of the week. Do not worry if the classes are full.`;
-        if (customInstructions) {
-            inputMessage += customInstructions;
-        }
-        if (timePreferenceEarly) {
-            inputMessage += `${timePreferenceEarly}. `;
-        }
-        if (timePreferenceLate) {
-            inputMessage += `${timePreferenceLate}. `;
-        }
-
-        inputMessage += "Put your detailed reasoning in the message!!!";
-        console.log(`Input message: ${inputMessage}`)
-        return inputMessage;
-    };
+        console.log(`Input classes: ${inputClasses}`);
+        return inputClasses;
+    }
 
     const createSchedule = async () => {
         if (classInfo.length === 0) {
@@ -289,17 +277,19 @@ const ScheduleBuilder = () => {
         }
         
         setLoading(true);
+        const inputClasses = await formatInputClasses();
+        console.log(timePreferenceEarly, timePreferenceLate);
         try {
-            const inputMessage = await createInputMessage();
             // Remember to switch URL back to non-local when deploying. Local: http://127.0.0.1:5001/gpt-advisor/us-central1/schedule_builder. Production: https://schedule-builder-yjuaxbcwea-uc.a.run.app
-            const response = await fetch("https://schedule-builder-yjuaxbcwea-uc.a.run.app", {
+            const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/csp_build_schedule", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    message: inputMessage,
-                    threadId: threadId,
+                    input_classes: inputClasses,
+                    optimimze_ratings: true,
+                    time_constraints: [timePreferenceEarly, timePreferenceLate],
                 }),
             });
 
@@ -314,7 +304,7 @@ const ScheduleBuilder = () => {
                 // setThreadId(data.threadId); //Temporarily commented out so we don't keep using the same thread
             }
 
-            if (data.class_data) {
+            if (data) {
                 setSchedule(data);
                 // Create an array of input classes Mnemonic and Number
                 let inputClasses = [];
@@ -389,18 +379,6 @@ const ScheduleBuilder = () => {
                             </div>
 
                             <div className="options-container">
-                                {/* <div className="spread-option">
-                                    <label>Schedule Spread:</label>
-                                    <select 
-                                        value={spread} 
-                                        onChange={(e) => setSpread(e.target.value)}
-                                        className="spread-select"
-                                    >
-                                        <option value="evenly">Evenly Spread</option>
-                                        <option value="minimally">Minimally Spread</option>
-                                        <option value="moderately">Moderately Spread</option>
-                                    </select>
-                                </div> */}
                                 <div className="spread-option">
                                     <label>Time Preference:</label>
                                     <select 
@@ -409,9 +387,9 @@ const ScheduleBuilder = () => {
                                         className="spread-select"
                                     >
                                         <option value="">Select an option</option>
-                                        <option value="No classes before 8AM">No classes before 8AM</option>
-                                        <option value="No classes before 9PM">No classes before 9PM</option>
-                                        <option value="No classes before 10PM">No classes before 10PM</option>
+                                        <option value="8:00am">No classes before 8AM</option>
+                                        <option value="9:00am">No classes before 9AM</option>
+                                        <option value="10:00am">No classes before 10AM</option>
                                     </select>
                                     <select
                                         value={timePreferenceLate} 
@@ -419,11 +397,11 @@ const ScheduleBuilder = () => {
                                             className="spread-select"
                                         >
                                         <option value="">Select an option</option>
-                                        <option value="No classes after 4PM">No classes after 4PM</option>
-                                        <option value="No classes after 5PM">No classes after 5PM</option>
-                                        <option value="No classes after 6PM">No classes after 6PM</option>
-                                        <option value="No classes after 7PM">No classes after 7PM</option>
-                                        <option value="No classes after 8PM">No classes after 8PM</option>
+                                        <option value="4:00pm">No classes after 4PM</option>
+                                        <option value="5:00pm">No classes after 5PM</option>
+                                        <option value="6:00pm">No classes after 6PM</option>
+                                        <option value="7:00pm">No classes after 7PM</option>
+                                        <option value="8:00pm">No classes after 8PM</option>
                                     </select>
                                 </div>
 
