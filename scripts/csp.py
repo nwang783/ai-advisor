@@ -291,7 +291,7 @@ class CSP:
                 raise ValueError(f"Cannot parse schedule format: {schedule_string}")
             
             # Extract components
-            days = [match.group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
+            days = [match .group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
             start_time = self.format_time(match.group(2).strip())
             end_time = self.format_time(match.group(3).strip())
             
@@ -409,13 +409,18 @@ class CSP:
                     return True
         
         # Check against time constraints if specified
-        if self.time_constraints:
-            parsed_start = parsed_new_class['start_time']
-            parsed_end = parsed_new_class['end_time']
-            
-            if (parsed_start < self.time_constraints[0] or 
-                parsed_end > self.time_constraints[1]):
-                return True
+        print(self.time_constraints.keys())
+        print(parsed_new_class['days'])
+        if set(self.time_constraints.keys()) & set(parsed_new_class['days']):
+            for day in parsed_new_class['days']:
+                parsed_start = parsed_new_class['start_time']
+                parsed_end = parsed_new_class['end_time']
+                constaint_start = self.time_constraints[day][0]
+                constaint_end = self.time_constraints[day][1]
+                
+                if (parsed_start < constaint_start or 
+                    parsed_end > constaint_end):
+                    return True
         
         return False
     
@@ -571,7 +576,7 @@ def calculate_solution_stats(solution):
     }
 
 data = {}
-input_classes = ['CS 2120', 'CS 2100']
+input_classes = ['CS 2120', 'CS 2100', 'APMA 3080', 'PHYS 1425', 'ENGR 1020']
 for course in input_classes:
     mnemonic, number = course.split()
     _, data[course] = get_comprehensive_course_info(mnemonic, number)
@@ -604,17 +609,17 @@ for course, course_data in data.items():
             domains[course][section_number]["instructor"] = instructor
             domains[course][section_number]["location"] = section['location']
 
-print(f'Variables: {variables}')
-print(f'Domains: {domains}')
-
 # Time constraints (optional)
-time_constraints = (
-    dt.strptime("8:00am", "%I:%M%p").time(), 
-    dt.strptime("6:00pm", "%I:%M%p").time()
-)
+time_constraints = {"Mo": ("10:00am", "6:00pm"), "Tu": ("8:00am", "6:00pm"), "We": ("8:00am", "6:00pm"), "Th": ("8:00am", "6:00pm"), "Fr": ("11:00am", "6:00pm")}
+
+time_constraints_dt = {
+    day: tuple(dt.strptime(time, "%I:%M%p").time() 
+    for time in times) 
+    for day, times in time_constraints.items()
+}
 
 # Create the CSP instance
-csp = CSP(variables, domains, time_constraints)
+csp = CSP(variables, domains, time_constraints_dt)
 
 # Solve and get the schedule
 solution = csp.solve()

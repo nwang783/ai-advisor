@@ -12,6 +12,9 @@ import pandas as pd
 # Initialize Firebase Admin
 initialize_app()
 
+# TODO 
+# NEED TO DEPLOY THIS FUNCTION TO FIREBASE
+
 class CSP:
     def __init__(self, variables, domains, time_constraints=None):
         """
