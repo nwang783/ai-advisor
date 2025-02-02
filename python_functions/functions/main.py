@@ -540,6 +540,41 @@ def find_stats_for_section(instructor, course_data):
                 
     return None  # Default stats if not founds
 
+def calculate_solution_stats(solution):
+    """
+    Calculate the average rating, difficulty, and GPA for the solution
+    """
+    num_ratings = 0
+    total_rating = 0
+    num_difficulties = 0
+    total_difficulty = 0
+    num_gpas = 0
+    total_gpa = 0
+    
+    for course, sections in solution.items():
+        for section, section_data in sections.items():
+            # Check if 'rating' exists and is not None
+            if section_data.get('rating') is not None:
+                num_ratings += 1
+                total_rating += section_data['rating']
+            
+            # Check if 'difficulty' exists and is not None
+            if section_data.get('difficulty') is not None:
+                num_difficulties += 1
+                total_difficulty += section_data['difficulty']
+            
+            # Check if 'gpa' exists and is not None
+            if section_data.get('gpa') is not None:
+                num_gpas += 1
+                total_gpa += section_data['gpa']
+    
+    # Handle cases where there are no ratings, difficulties, or GPAs to avoid ZeroDivisionError
+    return {
+        'average_rating': round(total_rating / num_ratings, 2) if num_ratings > 0 else 0,
+        'average_difficulty': round(total_difficulty / num_difficulties, 2) if num_difficulties > 0 else 0,
+        'average_gpa': round(total_gpa / num_gpas, 2) if num_gpas > 0 else 0
+    }
+
 @https_fn.on_request()
 def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
     """HTTP Cloud Function that using a csp algorithm to build a schedule.
@@ -618,8 +653,16 @@ def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
             final_schedule = csp.solve(optimize_ratings=optimize_ratings)
             print(f"Final Schedule: {final_schedule}")
 
+        stats = calculate_solution_stats(final_schedule)
+        print(f"Solution Stats: {stats}")
+
+        response_data = {
+            'schedule': final_schedule,
+            'stats': stats
+        }
+        
         return https_fn.Response(
-            json.dumps(final_schedule),
+            json.dumps(response_data),
             headers={'Access-Control-Allow-Origin': '*'}
         )
 

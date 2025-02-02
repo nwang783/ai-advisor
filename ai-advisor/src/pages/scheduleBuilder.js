@@ -289,7 +289,7 @@ const ScheduleBuilder = () => {
                 body: JSON.stringify({
                     input_classes: inputClasses,
                     optimimze_ratings: true,
-                    time_constraints: [timePreferenceEarly, timePreferenceLate],
+                    time_constraints: (timePreferenceEarly && timePreferenceLate) ? [timePreferenceEarly, timePreferenceLate] : null,
                 }),
             });
 
@@ -304,8 +304,8 @@ const ScheduleBuilder = () => {
                 // setThreadId(data.threadId); //Temporarily commented out so we don't keep using the same thread
             }
 
-            if (data) {
-                setSchedule(data);
+            if (data.schedule) {
+                setSchedule(data.schedule);
                 // Create an array of input classes Mnemonic and Number
                 let inputClasses = [];
                 classInfo.forEach((classObj) => {
