@@ -45,7 +45,7 @@ class CSP:
                 raise ValueError(f"Cannot parse schedule format: {schedule_string}")
             
             # Extract components
-            days = [match.group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
+            days = [match .group(1)[i:i+2] for i in range(0, len(match.group(1)), 2)]
             start_time = self.format_time(match.group(2).strip())
             end_time = self.format_time(match.group(3).strip())
             
@@ -163,13 +163,18 @@ class CSP:
                     return True
         
         # Check against time constraints if specified
-        if self.time_constraints:
-            parsed_start = parsed_new_class['start_time']
-            parsed_end = parsed_new_class['end_time']
-            
-            if (parsed_start < self.time_constraints[0] or 
-                parsed_end > self.time_constraints[1]):
-                return True
+        print(self.time_constraints.keys())
+        print(parsed_new_class['days'])
+        if set(self.time_constraints.keys()) & set(parsed_new_class['days']):
+            for day in parsed_new_class['days']:
+                parsed_start = parsed_new_class['start_time']
+                parsed_end = parsed_new_class['end_time']
+                constaint_start = self.time_constraints[day][0]
+                constaint_end = self.time_constraints[day][1]
+                
+                if (parsed_start < constaint_start or 
+                    parsed_end > constaint_end):
+                    return True
         
         return False
     
@@ -642,22 +647,26 @@ def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
 
         optimize_ratings = request_json.get('optimize_ratings', False)
         time_constraints = request_json.get('time_constraints', None)
-        if time_constraints is not None:
-            time_constraints = [dt.strptime(t, "%I:%M%p").time() for t in time_constraints]
-            print(f"Time Constraints: {time_constraints}")
-            csp = CSP(variables, domains, time_constraints)
-            final_schedule = csp.solve(optimize_ratings=optimize_ratings)
-            print(f"Final Schedule: {final_schedule}")
-        else:
-            csp = CSP(variables, domains)
-            final_schedule = csp.solve(optimize_ratings=optimize_ratings)
-            print(f"Final Schedule: {final_schedule}")
+        time_constraints_dt = {
+            day: tuple(dt.strptime(time, "%I:%M%p").time() 
+            for time in times) 
+            for day, times in time_constraints.items()
+        }
+        # Create the CSP instance
+        csp = CSP(variables, domains, time_constraints_dt)
 
-        stats = calculate_solution_stats(final_schedule)
+        # Solve and get the schedule
+        solution = csp.solve()
+        print(solution)
+        stats = calculate_solution_stats(solution)
+        print(f"\nNo optimization stats: {stats}")
+
+
+        stats = calculate_solution_stats(solution)
         print(f"Solution Stats: {stats}")
 
         response_data = {
-            'schedule': final_schedule,
+            'schedule': solution,
             'stats': stats
         }
         

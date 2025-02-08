@@ -25,7 +25,7 @@ const LoadingAnimation = () => {
         <div className="text-gray-600 animate-spin transition-transform duration-300 hover:scale-110">
           {icons[iconIndex]}
         </div>
-        <p className="text-black-600 text-center">
+        <p className="text-black-600 text-center" style={{ color: '000000' }}>
           Building a schedule can take up to four minutes
         </p>
       </div>

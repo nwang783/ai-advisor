@@ -247,6 +247,17 @@
     cursor: pointer;
 }
 
+.time-constraints-btn {
+    width: 100%;
+    padding: 0.75rem;
+    color: black;
+    border: 1px solid #18181b;
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
 .create-schedule-btn:disabled {
     background-color: #d4d4d8;
     cursor: not-allowed;
@@ -398,6 +409,17 @@
     border-radius: 0.5rem;
     position: relative;
     max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-content-time-constraints {
+    background: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    position: relative;
+    max-width: 750px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
