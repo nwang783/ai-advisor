@@ -7,7 +7,6 @@ from urllib.parse import urlencode
 from typing import Dict, Optional
 from datetime import datetime as dt
 import re
-import pandas as pd
 
 # Initialize Firebase Admin
 initialize_app()
@@ -582,15 +581,17 @@ def calculate_solution_stats(solution):
 
 @https_fn.on_request()
 def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
-    """HTTP Cloud Function that using a csp algorithm to build a schedule.
+    """HTTP Cloud Function that using a csp algorithm to build a schedule
     
     Args: 
     1. input_classes (List[str]): List of classes to build a schedule for. 
         Should be in the format of 'CS 1110', 'APMA 3080', etc. 
     2. time_constraints (Optional[List[str]]): List of time constraints in the format of 'HH:MM AM/PM'.
         """
+    print("Request received")
     try:
         if req.method == 'OPTIONS':
+            print("Options request")
             return https_fn.Response(
                 status=204,
                 headers={

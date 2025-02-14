@@ -298,7 +298,7 @@ const ScheduleBuilder = () => {
     const formattedTimeConstraints = formatTimeConstraints();
 
     try {
-      const response = await fetch("http://127.0.0.1:5001/gpt-advisor/us-central1/csp_build_schedule", {
+      const response = await fetch("https://csp-build-schedule-yjuaxbcwea-uc.a.run.app", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

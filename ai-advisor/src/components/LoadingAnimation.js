@@ -26,7 +26,7 @@ const LoadingAnimation = () => {
           {icons[iconIndex]}
         </div>
         <p className="text-black-600 text-center" style={{ color: '000000' }}>
-          Building a schedule can take up to four minutes
+          Building a schedule can take up to one minutes
         </p>
       </div>
     </div>
