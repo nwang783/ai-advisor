@@ -11,9 +11,6 @@ import re
 # Initialize Firebase Admin
 initialize_app()
 
-# TODO 
-# NEED TO DEPLOY THIS FUNCTION TO FIREBASE
-
 class CSP:
     def __init__(self, variables, domains, time_constraints=None):
         """
@@ -110,11 +107,12 @@ class CSP:
         for course, sections in original_domains.items():
             lab_sections = {}  # To hold lab sections
             lecture_sections = {}  # To hold lecture sections
+            mnemonic = course.split()[0]
 
             # Separate lecture and lab sections
             for section, section_data in sections.items():
                 # Assume lab sections start with "1"
-                if str(section).startswith("1"):
+                if str(section).startswith("1") and mnemonic != "EGMT":
                     lab_sections[section] = section_data
                 else:
                     lecture_sections[section] = section_data
@@ -614,8 +612,9 @@ def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
         # Get the course info for each input class
         data = {}
         for course in request_json.get('input_classes'):
-            mnemonic, number = course.split()
-            _, data[course] = get_comprehensive_course_info(mnemonic, number)
+            mnemonic, number = course.split()[:2]
+            title = course.split("|")[1].strip()
+            _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
         
         # Process the data into variables and domains
         variables = []

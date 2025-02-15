@@ -357,11 +357,12 @@ class CSP:
         for course, sections in original_domains.items():
             lab_sections = {}  # To hold lab sections
             lecture_sections = {}  # To hold lecture sections
+            mnemonic = course.split()[0]
 
             # Separate lecture and lab sections
             for section, section_data in sections.items():
                 # Assume lab sections start with "1"
-                if str(section).startswith("1"):
+                if str(section).startswith("1") and mnemonic != "EGMT":
                     lab_sections[section] = section_data
                 else:
                     lecture_sections[section] = section_data
@@ -379,7 +380,7 @@ class CSP:
                 
                 # Add lab sections to domains
                 self.domains[lab_course_key] = lab_sections
-    
+
     def check_for_conflicts(self, new_class, current_schedule):
         """
         Check if a new class conflicts with existing schedule
@@ -576,10 +577,11 @@ def calculate_solution_stats(solution):
     }
 
 data = {}
-input_classes = ['CS 2120', 'CS 2100', 'APMA 3080', 'PHYS 1425', 'ENGR 1020']
+input_classes = ['EGMT 1510 | The Art of Vulnerability']
 for course in input_classes:
-    mnemonic, number = course.split()
-    _, data[course] = get_comprehensive_course_info(mnemonic, number)
+    mnemonic, number = course.split()[:2]
+    title = course.split("|")[1].strip()
+    _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
 
 variables = []
 domains = {}
