@@ -613,8 +613,11 @@ def csp_build_schedule(req: https_fn.Request) -> https_fn.Response:
         data = {}
         for course in request_json.get('input_classes'):
             mnemonic, number = course.split()[:2]
-            title = course.split("|")[1].strip()
-            _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
+            if "|" in course:
+                title = course.split("|")[1].strip()
+                _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
+            else:
+                _, data[course] = get_comprehensive_course_info(mnemonic, number)
         
         # Process the data into variables and domains
         variables = []

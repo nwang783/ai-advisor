@@ -577,11 +577,14 @@ def calculate_solution_stats(solution):
     }
 
 data = {}
-input_classes = ['EGMT 1510 | The Art of Vulnerability']
+input_classes = ['EGMT 1510 | The Art of Vulnerability', 'APMA 3080']
 for course in input_classes:
     mnemonic, number = course.split()[:2]
-    title = course.split("|")[1].strip()
-    _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
+    if "|" in course:
+        title = course.split("|")[1].strip()
+        _, data[course] = get_comprehensive_course_info(mnemonic, number, topic=title)
+    else:
+        _, data[course] = get_comprehensive_course_info(mnemonic, number)
 
 variables = []
 domains = {}

@@ -267,7 +267,9 @@ const ScheduleBuilder = () => {
   };
 
   const formatInputClasses = async () => {
-    const inputClasses = classInfo.map(classObj => `${classObj.Mnemonic} ${classObj.Number} | ${classObj.Title}`);
+    const inputClasses = classInfo.map(classObj => 
+      `${classObj.Mnemonic} ${classObj.Number}${classObj.Mnemonic === "EGMT" ? ` | ${classObj.Title}` : ''}`
+    );
     console.log(`Input classes: ${inputClasses}`);
     return inputClasses;
   };
@@ -298,7 +300,7 @@ const ScheduleBuilder = () => {
     const formattedTimeConstraints = formatTimeConstraints();
 
     try {
-      const response = await fetch("https://csp-build-schedule-yjuaxbcwea-uc.a.run.app", { // http://127.0.0.1:5001/gpt-advisor/us-central1/csp_build_schedule
+      const response = await fetch("https://csp-build-schedule-yjuaxbcwea-uc.a.run.app", { // http://127.0.0.1:5001/gpt-advisor/us-central1/csp_build_schedule https://csp-build-schedule-yjuaxbcwea-uc.a.run.app
         method: "POST",
         headers: {
           "Content-Type": "application/json",
