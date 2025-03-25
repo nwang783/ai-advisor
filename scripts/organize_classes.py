@@ -2,7 +2,7 @@ import pandas as pd
 
 def organize_data():
     unique_classes = {'Title': [], 'Mnemonic': [], 'Number': []}  # Initialize dictionary with lists
-    class_df = pd.read_csv('searchData.csv')
+    class_df = pd.read_csv('searchDataFall2025.csv')
     class_data = class_df.loc[:, ['Mnemonic', 'Number', 'Title', 'Topic']]
     
     # Iterate through rows
@@ -21,7 +21,7 @@ def organize_data():
 
     # Print the resulting dictionary
     unique_classes_df = pd.DataFrame(unique_classes)
-    unique_classes_df.to_json('unique_classes.json', orient='records')
+    unique_classes_df.to_json('unique_classes_fall_2025.json', orient='records')
 
 organize_data()
 

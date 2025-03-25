@@ -344,7 +344,7 @@ def get_comprehensive_course_info(mnemonic: str, number: str, instructor: str = 
 
             params = {
                 "Type": "Search",
-                "Semester": "1252",
+                "Semester": "1258",
                 "iMnemonic": mnemonic,
                 "iNumber": number,
                 "iInstructor": instructor,
